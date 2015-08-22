@@ -14,6 +14,7 @@ var DualFilter=require("ksana2015-dualfilter").Component;
 var HTMLFileOpener=require("ksana2015-htmlfileopener").Component;
 var theme_bootstrap=require("ksana2015-breadcrumbtoc/theme_bootstrap");
 var BreadcrumbTOC=require("ksana2015-breadcrumbtoc").Component;
+var SegNav=require("ksana2015-segnav").Component;
 var db="cbeta";
 var styles={
   container:{display:"flex"}
@@ -23,8 +24,8 @@ var styles={
 }
 var maincomponent = React.createClass({displayName: "maincomponent",
   getInitialState:function() {
-    return {items:[],hits:[],vposs:[],itemclick:" ",text:"",q:"",toc:[],
-            vpos:0,localmode:false,ready:false};
+    return {items:[],hits:[],vposs:[],itemclick:" ",text:"",tofind1:"",q:"",toc:[],
+            vpos:0,localmode:false,ready:false,segnames:[],txtid:""};
   }
   ,componentDidMount:function() {
     ksa.tryOpen(db,function(err){
@@ -39,20 +40,26 @@ var maincomponent = React.createClass({displayName: "maincomponent",
     var that=this;
     ksa.filter({db:db,regex:tofind1,q:tofind2,field:"mulu"},function(err,items,hits,vposs){
       ksa.toc({db:db,q:tofind2,tocname:"mulu"},function(err,res){
-        that.setState({items:items,hits:hits||[],vposs:vposs||[],q:tofind2,toc:res.toc},function(){
+        that.setState({items:items,hits:hits||[],tofind1:tofind1,vposs:vposs||[],q:tofind2,toc:res.toc},function(){
           that.fetchText(vposs[0]);
         });
+        if (!that.state.segnames.length) {
+          ksa.get(db,"segnames",function(segnames){
+            that.setState({segnames: segnames});
+          });
+        }
       })
     });
   }
   ,fetchText:function(vpos){
     ksa.fetch({db:db,vpos:vpos,q:this.state.q},function(err,content){
       if (!content || !content.length) return;
-      this.setState({vpos:vpos,text:content[0].text,hits:content[0].hits});  
+      this.setState({vpos:vpos,text:content[0].text,hits:content[0].hits,txtid:content[0].uti}); 
+
     }.bind(this));
   }
   ,onItemClick:function(e) {
-    this.fetchText(e.target.dataset.vpos);
+    this.fetchText(parseInt(e.target.dataset.vpos));
   }
   ,renderText:function() {
     return ksa.renderHits(this.state.text,this.state.hits,E.bind(null,"span"));
@@ -70,6 +77,14 @@ var maincomponent = React.createClass({displayName: "maincomponent",
       React.createElement("br", null), React.createElement("a", {target: "_new", href: "https://github.com/ksanaforge/dualfilter-sample"}, "Github Repo")
     )
   }
+  ,onBreadcrumbSelect:function(itemidx,vpos) {
+    this.fetchText(vpos);
+  }
+  ,onGoSegment:function(seg) {
+    ksa.txtid2vpos(db,seg,function(err,vpos){
+      if (!err) this.fetchText(vpos);
+    }.bind(this));
+  }
   ,render: function() {
     if (!this.state.ready) return this.renderOpenKDB();
     return React.createElement("div", {style: styles.container}, 
@@ -84,14 +99,19 @@ var maincomponent = React.createClass({displayName: "maincomponent",
           onFilter: this.onFilter})
       ), 
       React.createElement("div", {style: styles.rightpanel}, 
-      React.createElement(BreadcrumbTOC, {toc: this.state.toc, theme: theme_bootstrap}), React.createElement("br", null), 
+
+      React.createElement(BreadcrumbTOC, {toc: this.state.toc, vpos: this.state.vpos, 
+        theme: theme_bootstrap, keyword: this.state.tofind1, onSelect: this.onBreadcrumbSelect}), 
+
+        React.createElement(SegNav, {size: 11, segs: this.state.segnames, value: this.state.txtid, onGoSegment: this.onGoSegment}), 
+        React.createElement("br", null), 
         this.renderText()
       )
     )    
   }
 });
 module.exports=maincomponent;
-},{"ksana-simple-api":"ksana-simple-api","ksana2015-breadcrumbtoc":"C:\\ksana2015\\node_modules\\ksana2015-breadcrumbtoc\\index.js","ksana2015-breadcrumbtoc/theme_bootstrap":"C:\\ksana2015\\node_modules\\ksana2015-breadcrumbtoc\\theme_bootstrap.js","ksana2015-dualfilter":"C:\\ksana2015\\node_modules\\ksana2015-dualfilter\\index.js","ksana2015-htmlfileopener":"C:\\ksana2015\\node_modules\\ksana2015-htmlfileopener\\index.js","react":"react"}],"C:\\ksana2015\\node_modules\\ksana2015-breadcrumbtoc\\breadcrumbtoc.js":[function(require,module,exports){
+},{"ksana-simple-api":"ksana-simple-api","ksana2015-breadcrumbtoc":"C:\\ksana2015\\node_modules\\ksana2015-breadcrumbtoc\\index.js","ksana2015-breadcrumbtoc/theme_bootstrap":"C:\\ksana2015\\node_modules\\ksana2015-breadcrumbtoc\\theme_bootstrap.js","ksana2015-dualfilter":"C:\\ksana2015\\node_modules\\ksana2015-dualfilter\\index.js","ksana2015-htmlfileopener":"C:\\ksana2015\\node_modules\\ksana2015-htmlfileopener\\index.js","ksana2015-segnav":"C:\\ksana2015\\node_modules\\ksana2015-segnav\\index.js","react":"react"}],"C:\\ksana2015\\node_modules\\ksana2015-breadcrumbtoc\\breadcrumbtoc.js":[function(require,module,exports){
 var React=require("react/addons");
 var E=React.createElement;
 var PT=React.PropTypes;
@@ -135,8 +155,8 @@ var BreadcrumbTOC=React.createClass({
 		,hits:PT.array
 		,theme:PT.object
 		,onSelect:PT.func
-		,cur:PT.number   //jump with cur node
 		,vpos:PT.number  //jump with vpos
+		,keyword:PT.string
 	}
 	,componentWillReceiveProps:function(nextProps,nextState) {
 		if (nextProps.toc && !nextProps.toc.built) {
@@ -144,10 +164,6 @@ var BreadcrumbTOC=React.createClass({
 		}
 		if (nextProps.hits!==this.props.hits) {
 			this.clearHits();
-		}
-
-		if (typeof nextProps.cur!=="undefined" &&nextProps.cur!=this.state.cur) {
-			nextState.cur=nextProps.cur;
 		}
 	}
 	,componentWillMount:function(){
@@ -157,7 +173,7 @@ var BreadcrumbTOC=React.createClass({
 		return {theme:{}};
 	}
 	,getInitialState:function(){
-		return {ancestors:[],cur:this.props.cur||0};
+		return {};
 	}
 	,clearHits:function() {
 		for (var i=0;i<this.props.toc;i++) {
@@ -165,27 +181,28 @@ var BreadcrumbTOC=React.createClass({
 		}
 	}
 	,onSelect:function(idx,children,level) {
-		var ancestors=this.state.ancestors;
-		ancestors[level]=idx;
-		this.setState({ancestors:ancestors});
-		this.props.onSelect && this.props.onSelect(idx);
-		//console.log(idx,children,level)
+		this.props.onSelect && this.props.onSelect(idx, children[idx].vpos+1);//don't know why???
+	}
+	,closestItem:function(tocitems,vpos) {
+		for (i=1;i<tocitems.length;i++) {
+			if (this.props.toc[tocitems[i]].vpos>=vpos) return i-1;
+		}
+		return tocitems.length-1;
 	}
 	,renderCrumbs:function() {
 		var dropdown=this.props.theme.dropdown;
-		var cur=this.state.cur,toc=this.props.toc,out=[],level=0;
+		var cur=0,toc=this.props.toc,out=[],level=0;
 		do {
 			var children=getChildren(toc,cur);
 			if (!children.length) break;
-			var ancestor=this.state.ancestors[level] || 0;
-			var cur = children[ancestor] ;
+
+			var selected = this.closestItem(children,this.props.vpos) ;
+			cur=children[selected];
 			var items=children.map(function(child){
-				return {t:toc[child].t,idx:child,hit:toc[child].hit};
+				return {t:toc[child].t,idx:child,hit:toc[child].hit,vpos:toc[child].vpos};
 			});
-			var selected=children.indexOf(cur);
-			if (selected==-1) selected=0;
 			out.push(E(dropdown,{onSelect:this.onSelect,level:level,
-				key:out.length,selected:selected,items:items}) );
+				key:out.length,selected:selected,items:items,keyword:this.props.keyword}) );
 			//if (out.length>5) break;
 			level++;
 		} while (true);
@@ -213,6 +230,7 @@ var BreadCrumbDropdown=React.createClass({
 		,selected:PT.number
 		,onSelect:PT.func
 		,level:PT.number.isRequired //which level
+		,keyword:PT.string
 	}
 	,getDefaultProp:function(){
 		return {items:[]}
@@ -220,16 +238,30 @@ var BreadCrumbDropdown=React.createClass({
 	,onSelect:function(idx) {
 		this.props.onSelect&&this.props.onSelect(idx,this.props.items,this.props.level);
 	}
+	,renderKeyword:function(t) {
+		if (this.props.keyword) {
+			var o=[],lastidx=0;
+			t.replace(new RegExp(this.props.keyword,"g"),function(m,idx){
+				o.push(t.substr(lastidx,idx));
+				o.push(E("span",{key:idx,style:{color:"red"}},m));
+				lastidx=idx+m.length;
+			});
+			o.push(t.substr(lastidx));
+			t=o;
+		}
+		return t;
+	}
 	,renderItem:function(item,idx) {
 		var hit=null;
 		item.hit&&(hit=E("span",{className:"hl0 pull-right"},item.hit));
-		return E(MenuItem,{key:idx,active:this.props.selected==idx,eventKey:idx},item.t,hit);
+		var t=this.renderKeyword(item.t);
+		return E(MenuItem,{key:idx,active:this.props.selected==idx,eventKey:idx},t,hit);
 	}
 	,render:function(){
 		var item=this.props.items[this.props.selected];
 		var title=item.t;
 		item.hit&&(title=[E("span",{key:1},item.t),E("span",{key:2,className:"hl0 pull-right"},item.hit||"")]);
-		return E(DropdownButton,{onSelect:this.onSelect,noCaret:true,title:title},
+		return E(DropdownButton,{onSelect:this.onSelect,noCaret:true,title:this.renderKeyword(title)},
 			this.props.items.map(this.renderItem));
 	}
 });
@@ -379,7 +411,88 @@ var HTMLFileOpener=React.createClass({
 module.exports=HTMLFileOpener;
 },{"react":"react"}],"C:\\ksana2015\\node_modules\\ksana2015-htmlfileopener\\index.js":[function(require,module,exports){
 module.exports={Component:require("./htmlfileopener")};
-},{"./htmlfileopener":"C:\\ksana2015\\node_modules\\ksana2015-htmlfileopener\\htmlfileopener.js"}],"C:\\ksana2015\\node_modules\\ksana2015-webruntime\\downloader.js":[function(require,module,exports){
+},{"./htmlfileopener":"C:\\ksana2015\\node_modules\\ksana2015-htmlfileopener\\htmlfileopener.js"}],"C:\\ksana2015\\node_modules\\ksana2015-segnav\\index.js":[function(require,module,exports){
+module.exports={Component:require("./segnav")};
+},{"./segnav":"C:\\ksana2015\\node_modules\\ksana2015-segnav\\segnav.js"}],"C:\\ksana2015\\node_modules\\ksana2015-segnav\\segnav.js":[function(require,module,exports){
+var React=require("react/addons");
+
+var E=React.createElement;
+var PT=React.PropTypes;
+var SegNav=React.createClass({
+	mixins:[React.addons.PureRender]
+	,propTypes:{
+		"segpat":PT.string
+		,"value":PT.string
+		,"segs":PT.array.isRequired
+		,"onGoSegment":PT.func
+	}
+	,getInitialState:function() {
+		return {segs:this.props.segs};
+	}
+	,componentWillMount:function() {
+		this.btn=this.props.button||"button";
+		if (this.props.segpat) {
+			var regex=new RegExp(this.props.segpat);
+			var segnames={};
+			this.props.segs.forEach(function(seg){
+				var m=seg.match(regex);
+				if (m && !segnames[m[1]]) segnames[m[1]]=true;
+			});
+			var segs=Object.keys(segnames);
+			var segnow=segs.indexOf(this.props.value)||0;
+			this.setState({segs:segs,segnow:segnow,segname:this.state.segs[segnow]});
+		}
+	}
+	,componentWillReceiveProps:function(nextProps,nextState) {
+		var idx=nextProps.segs.indexOf(nextProps.value);
+		if (idx>-1) {
+			this.setState({segnow:idx,segname:this.state.segs[idx]});
+		}
+		if (this.state.segs!==nextProps.segs) this.setState({segs:nextProps.segs});
+		
+	}
+	,goSeg:function(idx) {
+		this.setState({segnow:idx,segname:this.state.segs[idx]});
+		this.props.onGoSegment&&this.props.onGoSegment(this.state.segs[idx]);
+	}
+	,prev:function() {
+		var segnow=this.state.segnow;
+		if (segnow>0) segnow--;
+		this.goSeg(segnow);
+	}
+	,next:function(){
+		var segnow=this.state.segnow;
+		if (segnow<this.state.segs.length-1) segnow++;
+		this.goSeg(segnow);
+	}
+	,onKeyPress:function(e) {
+		if (e.key=="Enter") {
+			var idx=this.state.segs.indexOf(e.target.value);
+			if (idx>-1) this.goSeg(idx);
+		}
+	}
+	,onChange:function(e) {
+		var segname=e.target.value;
+		var idx=this.state.segs.indexOf(segname);
+		this.setState({segname:segname});
+		clearTimeout(this.timer);
+		this.timer=setTimeout(function(){
+			if (idx>-1) this.goSeg(idx);
+			else {
+				this.refs.seg.getDOMNode().value=this.state.segs[this.state.segnow];
+			}
+		}.bind(this),2000);
+	}
+	,render : function() {
+		return E("span",null,
+			E(this.btn,{style:this.props.style,onClick:this.prev,disabled:this.state.segnow==0},"←"),
+			E("input",{size:this.props.size||8,style:this.props.style,ref:"seg",value:this.state.segname,onKeyPress:this.onKeyPress,onChange:this.onChange}),
+			E(this.btn,{style:this.props.style,onClick:this.next,disabled:this.state.segnow==this.state.segs.length-1},"→")
+		);
+	}
+})
+module.exports=SegNav;
+},{"react/addons":"react/addons"}],"C:\\ksana2015\\node_modules\\ksana2015-webruntime\\downloader.js":[function(require,module,exports){
 
 var userCancel=false;
 var files=[];

@@ -5,6 +5,7 @@ var DualFilter=require("ksana2015-dualfilter").Component;
 var HTMLFileOpener=require("ksana2015-htmlfileopener").Component;
 var theme_bootstrap=require("ksana2015-breadcrumbtoc/theme_bootstrap");
 var BreadcrumbTOC=require("ksana2015-breadcrumbtoc").Component;
+var SegNav=require("ksana2015-segnav").Component;
 var db="cbeta";
 var styles={
   container:{display:"flex"}
@@ -14,8 +15,8 @@ var styles={
 }
 var maincomponent = React.createClass({
   getInitialState:function() {
-    return {items:[],hits:[],vposs:[],itemclick:" ",text:"",q:"",toc:[],
-            vpos:0,localmode:false,ready:false};
+    return {items:[],hits:[],vposs:[],itemclick:" ",text:"",tofind1:"",q:"",toc:[],
+            vpos:0,localmode:false,ready:false,segnames:[],txtid:""};
   }
   ,componentDidMount:function() {
     ksa.tryOpen(db,function(err){
@@ -30,20 +31,26 @@ var maincomponent = React.createClass({
     var that=this;
     ksa.filter({db:db,regex:tofind1,q:tofind2,field:"mulu"},function(err,items,hits,vposs){
       ksa.toc({db:db,q:tofind2,tocname:"mulu"},function(err,res){
-        that.setState({items:items,hits:hits||[],vposs:vposs||[],q:tofind2,toc:res.toc},function(){
+        that.setState({items:items,hits:hits||[],tofind1:tofind1,vposs:vposs||[],q:tofind2,toc:res.toc},function(){
           that.fetchText(vposs[0]);
         });
+        if (!that.state.segnames.length) {
+          ksa.get(db,"segnames",function(segnames){
+            that.setState({segnames: segnames});
+          });
+        }
       })
     });
   }
   ,fetchText:function(vpos){
     ksa.fetch({db:db,vpos:vpos,q:this.state.q},function(err,content){
       if (!content || !content.length) return;
-      this.setState({vpos:vpos,text:content[0].text,hits:content[0].hits});  
+      this.setState({vpos:vpos,text:content[0].text,hits:content[0].hits,txtid:content[0].uti}); 
+
     }.bind(this));
   }
   ,onItemClick:function(e) {
-    this.fetchText(e.target.dataset.vpos);
+    this.fetchText(parseInt(e.target.dataset.vpos));
   }
   ,renderText:function() {
     return ksa.renderHits(this.state.text,this.state.hits,E.bind(null,"span"));
@@ -61,6 +68,14 @@ var maincomponent = React.createClass({
       <br/><a target="_new" href="https://github.com/ksanaforge/dualfilter-sample">Github Repo</a>
     </div>
   }
+  ,onBreadcrumbSelect:function(itemidx,vpos) {
+    this.fetchText(vpos);
+  }
+  ,onGoSegment:function(seg) {
+    ksa.txtid2vpos(db,seg,function(err,vpos){
+      if (!err) this.fetchText(vpos);
+    }.bind(this));
+  }
   ,render: function() {
     if (!this.state.ready) return this.renderOpenKDB();
     return <div style={styles.container}>    
@@ -75,7 +90,12 @@ var maincomponent = React.createClass({
           onFilter={this.onFilter} />
       </div>
       <div style={styles.rightpanel}>
-      <BreadcrumbTOC toc={this.state.toc} theme={theme_bootstrap}/><br/>
+
+      <BreadcrumbTOC toc={this.state.toc} vpos={this.state.vpos} 
+        theme={theme_bootstrap} keyword={this.state.tofind1} onSelect={this.onBreadcrumbSelect}/>
+
+        <SegNav size={11} segs={this.state.segnames} value={this.state.txtid} onGoSegment={this.onGoSegment}/>
+        <br/>
         {this.renderText()}
       </div>
     </div>    
