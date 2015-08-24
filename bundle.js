@@ -7,6 +7,9 @@ ksanagap.boot("dualfilter-cbeta",function(){
 	ksana.mainComponent=React.render(Main,document.getElementById("main"));
 });
 },{"./src/main.jsx":"C:\\ksana2015\\dualfilter-cbeta\\src\\main.jsx","ksana2015-webruntime/ksanagap":"C:\\ksana2015\\node_modules\\ksana2015-webruntime\\ksanagap.js","ksana2015-webruntime/livereload":"C:\\ksana2015\\node_modules\\ksana2015-webruntime\\livereload.js","react":"react"}],"C:\\ksana2015\\dualfilter-cbeta\\src\\main.jsx":[function(require,module,exports){
+/*
+TODO _@80 cannot navigate
+*/
 var React=require("react");
 var E=React.createElement;
 var ksa=require("ksana-simple-api");
@@ -19,7 +22,7 @@ var db="cbeta";
 var styles={
   container:{display:"flex"}
   ,dualfilter:{flex:1,height:"100%",overflowY:"auto"}
-  ,rightpanel:{flex:2}
+  ,rightpanel:{flex:3}
   ,input:{fontSize:"100%",width:"100%"}
 }
 var maincomponent = React.createClass({displayName: "maincomponent",
@@ -40,7 +43,7 @@ var maincomponent = React.createClass({displayName: "maincomponent",
     var that=this;
     ksa.filter({db:db,regex:tofind1,q:tofind2,field:"mulu"},function(err,items,hits,vposs){
       ksa.toc({db:db,q:tofind2,tocname:"mulu"},function(err,res){
-        that.setState({items:items,hits:hits||[],tofind1:tofind1,vposs:vposs||[],q:tofind2,toc:res.toc},function(){
+        that.setState({items:items,tofind1:tofind1,vposs:vposs||[],q:tofind2,toc:res.toc},function(){
           that.fetchText(vposs[0]);
         });
         if (!that.state.segnames.length) {
@@ -93,8 +96,8 @@ var maincomponent = React.createClass({displayName: "maincomponent",
           hits: this.state.hits, 
           vpos: this.state.vposs, 
           inputstyle: styles.input, 
-          tofind1: "阿含", 
-          tofind2: "阿羅漢", 
+          tofind1: "悲華", 
+          tofind2: "淨土", 
           onItemClick: this.onItemClick, 
           onFilter: this.onFilter})
       ), 
