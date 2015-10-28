@@ -1,1 +1,1 @@
-browserify --bare -r react -r react/addons > react-bundle.js
+browserify --bare -r react -r react-dom -u react-native -u react-native-android-kdb > react-bundle.js

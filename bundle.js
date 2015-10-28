@@ -1,12 +1,13 @@
 (function e(t,n,r){function s(o,u){if(!n[o]){if(!t[o]){var a=typeof require=="function"&&require;if(!u&&a)return a(o,!0);if(i)return i(o,!0);var f=new Error("Cannot find module '"+o+"'");throw f.code="MODULE_NOT_FOUND",f}var l=n[o]={exports:{}};t[o][0].call(l.exports,function(e){var n=t[o][1][e];return s(n?n:e)},l,l.exports,e,t,n,r)}return n[o].exports}var i=typeof require=="function"&&require;for(var o=0;o<r.length;o++)s(r[o]);return s})({"C:\\ksana2015\\dualfilter-cbeta\\index.js":[function(require,module,exports){
 var React=require("react");
+var ReactDOM=require("react-dom");
 require("ksana2015-webruntime/livereload")(); 
 var ksanagap=require("ksana2015-webruntime/ksanagap");
 ksanagap.boot("dualfilter-cbeta",function(){
 	var Main=React.createElement(require("./src/main.jsx"));
-	ksana.mainComponent=React.render(Main,document.getElementById("main"));
+	ksana.mainComponent=ReactDOM.render(Main,document.getElementById("main"));
 });
-},{"./src/main.jsx":"C:\\ksana2015\\dualfilter-cbeta\\src\\main.jsx","ksana2015-webruntime/ksanagap":"C:\\ksana2015\\node_modules\\ksana2015-webruntime\\ksanagap.js","ksana2015-webruntime/livereload":"C:\\ksana2015\\node_modules\\ksana2015-webruntime\\livereload.js","react":"react"}],"C:\\ksana2015\\dualfilter-cbeta\\src\\main.jsx":[function(require,module,exports){
+},{"./src/main.jsx":"C:\\ksana2015\\dualfilter-cbeta\\src\\main.jsx","ksana2015-webruntime/ksanagap":"C:\\ksana2015\\node_modules\\ksana2015-webruntime\\ksanagap.js","ksana2015-webruntime/livereload":"C:\\ksana2015\\node_modules\\ksana2015-webruntime\\livereload.js","react":"react","react-dom":"react-dom"}],"C:\\ksana2015\\dualfilter-cbeta\\src\\main.jsx":[function(require,module,exports){
 /*
 TODO _@80 cannot navigate
 */
@@ -96,7 +97,7 @@ var maincomponent = React.createClass({displayName: "maincomponent",
           hits: this.state.hits, 
           vpos: this.state.vposs, 
           inputstyle: styles.input, 
-          tofind1: "悲華", 
+          tofind1: "", 
           tofind2: "淨土", 
           onItemClick: this.onItemClick, 
           onFilter: this.onFilter})
@@ -115,7 +116,7 @@ var maincomponent = React.createClass({displayName: "maincomponent",
 });
 module.exports=maincomponent;
 },{"ksana-simple-api":"ksana-simple-api","ksana2015-breadcrumbtoc":"C:\\ksana2015\\node_modules\\ksana2015-breadcrumbtoc\\index.js","ksana2015-breadcrumbtoc/theme_bootstrap":"C:\\ksana2015\\node_modules\\ksana2015-breadcrumbtoc\\theme_bootstrap.js","ksana2015-dualfilter":"C:\\ksana2015\\node_modules\\ksana2015-dualfilter\\index.js","ksana2015-htmlfileopener":"C:\\ksana2015\\node_modules\\ksana2015-htmlfileopener\\index.js","ksana2015-segnav":"C:\\ksana2015\\node_modules\\ksana2015-segnav\\index.js","react":"react"}],"C:\\ksana2015\\node_modules\\ksana2015-breadcrumbtoc\\breadcrumbtoc.js":[function(require,module,exports){
-var React=require("react/addons");
+var React=require("react");
 var E=React.createElement;
 var PT=React.PropTypes;
 var buildToc = function(toc) {
@@ -152,8 +153,7 @@ var getChildren = function(toc,n) {
 	return out;
 }
 var BreadcrumbTOC=React.createClass({
-	mixins:[React.addons.pureRenderMixin]
-	,propTypes:{
+	propTypes:{
 		toc:PT.array.isRequired
 		,hits:PT.array
 		,theme:PT.object
@@ -217,8 +217,8 @@ var BreadcrumbTOC=React.createClass({
 	}
 })
 module.exports=BreadcrumbTOC;
-},{"react/addons":"react/addons"}],"C:\\ksana2015\\node_modules\\ksana2015-breadcrumbtoc\\dropdown_bs.js":[function(require,module,exports){
-var React=require("react/addons");
+},{"react":"react"}],"C:\\ksana2015\\node_modules\\ksana2015-breadcrumbtoc\\dropdown_bs.js":[function(require,module,exports){
+var React=require("react");
 var E=React.createElement;
 var PT=React.PropTypes;
 
@@ -227,8 +227,7 @@ var DropdownButton=require("react-bootstrap").DropdownButton;
 var MenuItem=require("react-bootstrap").MenuItem;
 
 var BreadCrumbDropdown=React.createClass({
-	mixins:[React.addons.pureRenderMixin]
-	,propTypes:{
+	propTypes:{
 		items:PT.array.isRequired
 		,selected:PT.number
 		,onSelect:PT.func
@@ -269,14 +268,14 @@ var BreadCrumbDropdown=React.createClass({
 	}
 });
 module.exports=BreadCrumbDropdown;
-},{"react-bootstrap":"react-bootstrap","react/addons":"react/addons"}],"C:\\ksana2015\\node_modules\\ksana2015-breadcrumbtoc\\index.js":[function(require,module,exports){
+},{"react":"react","react-bootstrap":"react-bootstrap"}],"C:\\ksana2015\\node_modules\\ksana2015-breadcrumbtoc\\index.js":[function(require,module,exports){
 module.exports={Component:require("./breadcrumbtoc")};
 },{"./breadcrumbtoc":"C:\\ksana2015\\node_modules\\ksana2015-breadcrumbtoc\\breadcrumbtoc.js"}],"C:\\ksana2015\\node_modules\\ksana2015-breadcrumbtoc\\theme_bootstrap.js":[function(require,module,exports){
 var ButtonGroup=require("react-bootstrap").ButtonGroup;
 var BreadCrumbDropdown=require("./dropdown_bs");
 module.exports={container:ButtonGroup,dropdown:BreadCrumbDropdown};
 },{"./dropdown_bs":"C:\\ksana2015\\node_modules\\ksana2015-breadcrumbtoc\\dropdown_bs.js","react-bootstrap":"react-bootstrap"}],"C:\\ksana2015\\node_modules\\ksana2015-dualfilter\\dualfilter.js":[function(require,module,exports){
-var React=require("react/addons");
+var React=require("react");
 var ReactList=require("react-list");
 var E=React.createElement;
 var PT=React.PropTypes;
@@ -340,7 +339,7 @@ var DualFilter=React.createClass({
 	}
 })
 module.exports=DualFilter;
-},{"react-list":"react-list","react/addons":"react/addons"}],"C:\\ksana2015\\node_modules\\ksana2015-dualfilter\\index.js":[function(require,module,exports){
+},{"react":"react","react-list":"react-list"}],"C:\\ksana2015\\node_modules\\ksana2015-dualfilter\\index.js":[function(require,module,exports){
 module.exports={Component:require("./dualfilter")};
 },{"./dualfilter":"C:\\ksana2015\\node_modules\\ksana2015-dualfilter\\dualfilter.js"}],"C:\\ksana2015\\node_modules\\ksana2015-htmlfileopener\\htmlfileopener.js":[function(require,module,exports){
 var React=require("react");
@@ -417,13 +416,12 @@ module.exports={Component:require("./htmlfileopener")};
 },{"./htmlfileopener":"C:\\ksana2015\\node_modules\\ksana2015-htmlfileopener\\htmlfileopener.js"}],"C:\\ksana2015\\node_modules\\ksana2015-segnav\\index.js":[function(require,module,exports){
 module.exports={Component:require("./segnav")};
 },{"./segnav":"C:\\ksana2015\\node_modules\\ksana2015-segnav\\segnav.js"}],"C:\\ksana2015\\node_modules\\ksana2015-segnav\\segnav.js":[function(require,module,exports){
-var React=require("react/addons");
+var React=require("react");
 
 var E=React.createElement;
 var PT=React.PropTypes;
 var SegNav=React.createClass({
-	mixins:[React.addons.PureRender]
-	,propTypes:{
+	propTypes:{
 		"segpat":PT.string
 		,"value":PT.string
 		,"segs":PT.array.isRequired
@@ -495,7 +493,7 @@ var SegNav=React.createClass({
 	}
 })
 module.exports=SegNav;
-},{"react/addons":"react/addons"}],"C:\\ksana2015\\node_modules\\ksana2015-webruntime\\downloader.js":[function(require,module,exports){
+},{"react":"react"}],"C:\\ksana2015\\node_modules\\ksana2015-webruntime\\downloader.js":[function(require,module,exports){
 
 var userCancel=false;
 var files=[];
@@ -944,12 +942,16 @@ var boot=function(appId,cb) {
 		loadKsanajs();
 	}
 	ksana.appId=appId;
+	if (ksana.ready) {
+		cb();
+		return;
+	}
 	var timer=setInterval(function(){
 			if (ksana.ready){
 				clearInterval(timer);
 				cb();
 			}
-		});
+		},100);
 }
 
 
