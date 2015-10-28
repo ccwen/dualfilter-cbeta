@@ -6,8 +6,11 @@ DUALFilter CBETA
 
 install
 
+    git clone https://github.com/ksanaforge/dualfilter-cbeta
     npm i
-
+    
+    download cbeta.kdb from http://ya.ksana.tw/kdb/cbeta.kdb and put in dualfilter-cbeta
+    
 testing the search feature
 
     node testsearch
