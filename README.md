@@ -1,10 +1,15 @@
-scaffold for ksana2015 app
+DUALFilter CBETA
 ====
 
-install github.com/ksanaforge/ksana2015
+    CBETA.kdb is build from 
+    install github.com/ksanaforge/cbeta2015
 
-ks mkdb sample
+install
 
-react-bundle.js is created with 
+    npm i
 
-    browserify -r react -r react/addons > react-bundle.js
+testing the search feature
+
+    node testsearch
+    
+to run as static webpage,  open index.html in CHROME.
