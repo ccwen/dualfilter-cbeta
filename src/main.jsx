@@ -18,7 +18,7 @@ var styles={
 }
 var maincomponent = React.createClass({
   getInitialState:function() {
-    return {items:[],hits:[],vposs:[],itemclick:" ",text:"",tofind1:"",q:"",toc:[],
+    return {items:[],itemclick:" ",text:"",tofind1:"",q:"",toc:[],
             vpos:0,localmode:false,ready:false,segnames:[],txtid:"",
             tofind1:localStorage.getItem("cbeta-tofind1")||"玄奘",q:localStorage.getItem("cbeta-q")||"淨土"};
   }
@@ -33,14 +33,19 @@ var maincomponent = React.createClass({
   }
   ,onFilter:function(tofind1,q) {
     var that=this;
-    ksa.filter({db:db,regex:tofind1,q:q,field:"mulu"},function(err,items,hits,vposs){
+    ksa.filter({db:db,regex:tofind1,q:q,field:"mulu"},function(err,items){
 
       localStorage.setItem("cbeta-tofind1",tofind1);
       localStorage.setItem("cbeta-q",q);
-
+      if (items.length&&items[0].hits&&items[0].hits.length) {
+        items.sort(function(i1,i2){return i2.hits.length-i1.hits.length});
+      }
+      
       ksa.toc({db:db,q:q,tocname:"mulu"},function(err,res){
-        that.setState({items:items,tofind1:tofind1,vposs:vposs||[],q:q,toc:res.toc},function(){
-          that.fetchText(vposs[0]);
+
+
+        that.setState({items:items,tofind1:tofind1,q:q,toc:res.toc},function(){
+          that.fetchText(items[0].vpos);
         });
         if (!that.state.segnames.length) {
           ksa.get(db,"segnames",function(segnames){
@@ -57,8 +62,8 @@ var maincomponent = React.createClass({
 
     }.bind(this));
   }
-  ,onItemClick:function(e) {
-    this.fetchText(parseInt(e.target.dataset.vpos));
+  ,onItemClick:function(idx) {
+    this.fetchText(this.state.items[idx].vpos);
   }
   ,renderText:function() {
     return ksa.renderHits(this.state.text,this.state.hits,E.bind(null,"span"));
@@ -89,8 +94,6 @@ var maincomponent = React.createClass({
     return <div style={styles.container}>    
       <div style={styles.dualfilter}>
         <DualFilter items={this.state.items} 
-          hits={this.state.hits}
-          vpos={this.state.vposs}
           inputstyle={styles.input}
           tofind1={this.state.tofind1}
           tofind2={this.state.q}
