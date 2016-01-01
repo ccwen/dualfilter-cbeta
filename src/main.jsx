@@ -6,7 +6,6 @@ var E=React.createElement;
 var ksa=require("ksana-simple-api");
 var DualFilter=require("ksana2015-dualfilter").Component;
 var HTMLFileOpener=require("ksana2015-htmlfileopener").Component;
-var theme_bootstrap=require("ksana2015-breadcrumbtoc/theme_bootstrap");
 var BreadcrumbTOC=require("ksana2015-breadcrumbtoc").Component;
 var SegNav=require("ksana2015-segnav").Component;
 var db="cbeta";
@@ -18,7 +17,7 @@ var styles={
 }
 var maincomponent = React.createClass({
   getInitialState:function() {
-    return {items:[],itemclick:" ",text:"",tofind1:"",q:"",toc:[],
+    return {items:[],itemclick:" ",text:"",tofind1:"",q:"",toc:[],rawhits:[],
             vpos:0,localmode:false,ready:false,segnames:[],txtid:"",
             tofind1:localStorage.getItem("cbeta-tofind1")||"玄奘",q:localStorage.getItem("cbeta-q")||"淨土"};
   }
@@ -42,9 +41,7 @@ var maincomponent = React.createClass({
       }
       
       ksa.toc({db:db,q:q,tocname:"mulu"},function(err,res){
-
-
-        that.setState({items:items,tofind1:tofind1,q:q,toc:res.toc},function(){
+        that.setState({items:items,tofind1:tofind1,q:q,toc:res.toc,rawhits:res.hits},function(){
           that.fetchText(items[0].vpos);
         });
         if (!that.state.segnames.length) {
@@ -101,10 +98,8 @@ var maincomponent = React.createClass({
           onFilter={this.onFilter} />
       </div>
       <div style={styles.rightpanel}>
-
-      <BreadcrumbTOC toc={this.state.toc} vpos={this.state.vpos} 
-        theme={theme_bootstrap} keyword={this.state.tofind1} onSelect={this.onBreadcrumbSelect}/>
-
+      <BreadcrumbTOC toc={this.state.toc} vpos={this.state.vpos} hits={this.state.rawhits} treenodeHits={ksa.treenodehits}
+          onSelect={this.onBreadcrumbSelect} buttonClass="btn btn-link" separator="/"/>
         <SegNav size={11} segs={this.state.segnames} value={this.state.txtid} onGoSegment={this.onGoSegment}/>
         <br/>
         {this.renderText()}

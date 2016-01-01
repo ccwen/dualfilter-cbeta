@@ -16,7 +16,6 @@ var E=React.createElement;
 var ksa=require("ksana-simple-api");
 var DualFilter=require("ksana2015-dualfilter").Component;
 var HTMLFileOpener=require("ksana2015-htmlfileopener").Component;
-var theme_bootstrap=require("ksana2015-breadcrumbtoc/theme_bootstrap");
 var BreadcrumbTOC=require("ksana2015-breadcrumbtoc").Component;
 var SegNav=require("ksana2015-segnav").Component;
 var db="cbeta";
@@ -28,7 +27,7 @@ var styles={
 }
 var maincomponent = React.createClass({displayName: "maincomponent",
   getInitialState:function() {
-    return {items:[],itemclick:" ",text:"",tofind1:"",q:"",toc:[],
+    return {items:[],itemclick:" ",text:"",tofind1:"",q:"",toc:[],rawhits:[],
             vpos:0,localmode:false,ready:false,segnames:[],txtid:"",
             tofind1:localStorage.getItem("cbeta-tofind1")||"玄奘",q:localStorage.getItem("cbeta-q")||"淨土"};
   }
@@ -52,9 +51,7 @@ var maincomponent = React.createClass({displayName: "maincomponent",
       }
       
       ksa.toc({db:db,q:q,tocname:"mulu"},function(err,res){
-
-
-        that.setState({items:items,tofind1:tofind1,q:q,toc:res.toc},function(){
+        that.setState({items:items,tofind1:tofind1,q:q,toc:res.toc,rawhits:res.hits},function(){
           that.fetchText(items[0].vpos);
         });
         if (!that.state.segnames.length) {
@@ -111,10 +108,8 @@ var maincomponent = React.createClass({displayName: "maincomponent",
           onFilter: this.onFilter})
       ), 
       React.createElement("div", {style: styles.rightpanel}, 
-
-      React.createElement(BreadcrumbTOC, {toc: this.state.toc, vpos: this.state.vpos, 
-        theme: theme_bootstrap, keyword: this.state.tofind1, onSelect: this.onBreadcrumbSelect}), 
-
+      React.createElement(BreadcrumbTOC, {toc: this.state.toc, vpos: this.state.vpos, hits: this.state.rawhits, treenodeHits: ksa.treenodehits, 
+          onSelect: this.onBreadcrumbSelect, buttonClass: "btn btn-link", separator: "/"}), 
         React.createElement(SegNav, {size: 11, segs: this.state.segnames, value: this.state.txtid, onGoSegment: this.onGoSegment}), 
         React.createElement("br", null), 
         this.renderText()
@@ -123,7 +118,7 @@ var maincomponent = React.createClass({displayName: "maincomponent",
   }
 });
 module.exports=maincomponent;
-},{"ksana-simple-api":"ksana-simple-api","ksana2015-breadcrumbtoc":"C:\\ksana2015\\node_modules\\ksana2015-breadcrumbtoc\\index.js","ksana2015-breadcrumbtoc/theme_bootstrap":"C:\\ksana2015\\node_modules\\ksana2015-breadcrumbtoc\\theme_bootstrap.js","ksana2015-dualfilter":"C:\\ksana2015\\node_modules\\ksana2015-dualfilter\\index.js","ksana2015-htmlfileopener":"C:\\ksana2015\\node_modules\\ksana2015-htmlfileopener\\index.js","ksana2015-segnav":"C:\\ksana2015\\node_modules\\ksana2015-segnav\\index.js","react":"react"}],"C:\\ksana2015\\node_modules\\ksana2015-breadcrumbtoc\\breadcrumbtoc.js":[function(require,module,exports){
+},{"ksana-simple-api":"ksana-simple-api","ksana2015-breadcrumbtoc":"C:\\ksana2015\\node_modules\\ksana2015-breadcrumbtoc\\index.js","ksana2015-dualfilter":"C:\\ksana2015\\node_modules\\ksana2015-dualfilter\\index.js","ksana2015-htmlfileopener":"C:\\ksana2015\\node_modules\\ksana2015-htmlfileopener\\index.js","ksana2015-segnav":"C:\\ksana2015\\node_modules\\ksana2015-segnav\\index.js","react":"react"}],"C:\\ksana2015\\node_modules\\ksana2015-breadcrumbtoc\\breadcrumbtoc.js":[function(require,module,exports){
 var React=require("react");
 var E=React.createElement;
 var PT=React.PropTypes;
@@ -164,10 +159,12 @@ var BreadcrumbTOC=React.createClass({
 	propTypes:{
 		toc:PT.array.isRequired
 		,hits:PT.array
-		,theme:PT.object
 		,onSelect:PT.func
 		,vpos:PT.number  //jump with vpos
 		,keyword:PT.string
+		,treenodeHits:PT.func
+		,buttonClass:PT.string
+		,separator:PT.node
 	}
 	,componentWillReceiveProps:function(nextProps,nextState) {
 		if (nextProps.toc && !nextProps.toc.built) {
@@ -179,9 +176,6 @@ var BreadcrumbTOC=React.createClass({
 	}
 	,componentWillMount:function(){
 		buildToc(this.props.toc);
-	}
-	,getDefaultProps:function() {
-		return {theme:{}};
 	}
 	,getInitialState:function(){
 		return {};
@@ -201,38 +195,44 @@ var BreadcrumbTOC=React.createClass({
 		return tocitems.length-1;
 	}
 	,renderCrumbs:function() {
-		var dropdown=this.props.theme.dropdown;
+		var dropdown=require("./dropdown_bs");
 		var cur=0,toc=this.props.toc,out=[],level=0;
+		var children=getChildren(toc,cur),nextchildren;
 		do {
-			var children=getChildren(toc,cur);
-			if (!children.length) break;
-
 			var selected = this.closestItem(children,this.props.vpos) ;
 			cur=children[selected];
+
 			var items=children.map(function(child){
-				return {t:toc[child].t,idx:child,hit:toc[child].hit,vpos:toc[child].vpos};
-			});
+				var hit=toc[child].hit;
+				if (this.props.hits && isNaN(hit) && this.props.treenodeHits) {
+					hit=this.props.treenodeHits( toc,this.props.hits,child);
+				}
+
+				return {t:toc[child].t,idx:child,hit:hit,vpos:toc[child].vpos};
+			}.bind(this));
+
+			nextchildren=getChildren(toc,cur);
+
 			out.push(E(dropdown,{onSelect:this.onSelect,level:level,
+				separator:nextchildren.length?this.props.separator:null,//last separator is not shown
+				buttonClass:this.props.buttonClass,
 				key:out.length,selected:selected,items:items,keyword:this.props.keyword}) );
 			//if (out.length>5) break;
 			level++;
+			if (!nextchildren.length) break;
+			children=nextchildren;
 		} while (true);
 		return out;
 	}
 	,render:function(){
-		var container=this.props.theme.container || "div";
-		return E(container,null,this.renderCrumbs());
+		return E("div",{},this.renderCrumbs());
 	}
 })
 module.exports=BreadcrumbTOC;
-},{"react":"react"}],"C:\\ksana2015\\node_modules\\ksana2015-breadcrumbtoc\\dropdown_bs.js":[function(require,module,exports){
+},{"./dropdown_bs":"C:\\ksana2015\\node_modules\\ksana2015-breadcrumbtoc\\dropdown_bs.js","react":"react"}],"C:\\ksana2015\\node_modules\\ksana2015-breadcrumbtoc\\dropdown_bs.js":[function(require,module,exports){
 var React=require("react");
 var E=React.createElement;
 var PT=React.PropTypes;
-
-var Button=require("react-bootstrap").Button;
-var DropdownButton=require("react-bootstrap").DropdownButton;
-var MenuItem=require("react-bootstrap").MenuItem;
 
 var BreadCrumbDropdown=React.createClass({
 	propTypes:{
@@ -245,7 +245,14 @@ var BreadCrumbDropdown=React.createClass({
 	,getDefaultProp:function(){
 		return {items:[]}
 	}
-	,onSelect:function(e,idx) {
+	,onSelect:function(e) {
+		domnode=e.target.parentElement;
+		var idx=-1;
+		while (domnode) {
+			if (domnode.classList.contains("open")) domnode.classList.remove("open");
+			if (domnode.dataset && domnode.dataset.idx) idx=parseInt(domnode.dataset.idx);
+			domnode=domnode.parentElement;
+		}
 		this.props.onSelect&&this.props.onSelect(idx,this.props.items,this.props.level);
 	}
 	,renderKeyword:function(t) {
@@ -263,26 +270,34 @@ var BreadCrumbDropdown=React.createClass({
 	}
 	,renderItem:function(item,idx) {
 		var hit=null;
-		item.hit&&(hit=E("span",{className:"hl0 pull-right"},item.hit));
+		var style={cursor:"pointer"};
+		if (this.props.selected==idx) style.background="highlight"
+		item.hit&&(hit=E("span",{style:{color:"red"},className:"pull-right"},item.hit));
 		var t=this.renderKeyword(item.t);
-		return E(MenuItem,{key:idx,active:this.props.selected==idx,eventKey:idx},t,hit);
+		return E("li",{key:idx,"data-idx":idx},E("a",{style:style,onClick:this.onSelect},t,hit));
+	}
+
+	,open:function(e){
+		e.target.parentElement.classList.add("open");
 	}
 	,render:function(){
 		var item=this.props.items[this.props.selected];
+		if (!item)return E("span");
 		var title=item.t;
+
 		item.hit&&(title=[E("span",{key:1},item.t),E("span",{key:2,className:"hl0 pull-right"},item.hit||"")]);
-		return E(DropdownButton,{onSelect:this.onSelect,noCaret:true,title:this.renderKeyword(title)},
-			this.props.items.map(this.renderItem));
+		return E("span",{className:"dropdown"},
+				E("button",{key:"drop","data-toggle":"dropdown",className:this.props.buttonClass||"btn btn-default",
+					onClick:this.open}, this.props.items[this.props.selected].t ),
+				this.props.separator,
+				E("ul",{className:"dropdown-menu open",id:"for_shutting_warning_up",title:this.renderKeyword(title)},
+			this.props.items.map(this.renderItem)));
 	}
 });
 module.exports=BreadCrumbDropdown;
-},{"react":"react","react-bootstrap":"react-bootstrap"}],"C:\\ksana2015\\node_modules\\ksana2015-breadcrumbtoc\\index.js":[function(require,module,exports){
+},{"react":"react"}],"C:\\ksana2015\\node_modules\\ksana2015-breadcrumbtoc\\index.js":[function(require,module,exports){
 module.exports={Component:require("./breadcrumbtoc")};
-},{"./breadcrumbtoc":"C:\\ksana2015\\node_modules\\ksana2015-breadcrumbtoc\\breadcrumbtoc.js"}],"C:\\ksana2015\\node_modules\\ksana2015-breadcrumbtoc\\theme_bootstrap.js":[function(require,module,exports){
-var ButtonGroup=require("react-bootstrap").ButtonGroup;
-var BreadCrumbDropdown=require("./dropdown_bs");
-module.exports={container:ButtonGroup,dropdown:BreadCrumbDropdown};
-},{"./dropdown_bs":"C:\\ksana2015\\node_modules\\ksana2015-breadcrumbtoc\\dropdown_bs.js","react-bootstrap":"react-bootstrap"}],"C:\\ksana2015\\node_modules\\ksana2015-dualfilter\\dualfilter.js":[function(require,module,exports){
+},{"./breadcrumbtoc":"C:\\ksana2015\\node_modules\\ksana2015-breadcrumbtoc\\breadcrumbtoc.js"}],"C:\\ksana2015\\node_modules\\ksana2015-dualfilter\\dualfilter.js":[function(require,module,exports){
 var React=require("react");
 var ReactList=require("react-list");
 var E=React.createElement;
@@ -841,6 +856,7 @@ var initfs=function(grantedBytes,cb,context) {
 	}, errorHandler);
 }
 var init=function(quota,cb,context) {
+	if (!navigator.webkitPersistentStorage) return;
 	navigator.webkitPersistentStorage.requestQuota(quota,
 			function(grantedBytes) {
 				initfs(grantedBytes,cb,context);

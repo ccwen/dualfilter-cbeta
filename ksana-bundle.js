@@ -212,16 +212,16 @@ var simple=function(s) {
 }
 module.exports={simple:simple,tibetan:tibetan};
 },{}],3:[function(require,module,exports){
-var indexOfSorted = function (array, obj, near) { 
-  var low = 0,
-  high = array.length;
+'use strict';
+var indexOfSorted = function (array, obj, near) {
+  var low = 0, high = array.length, mid;
   while (low < high) {
-    var mid = (low + high) >> 1;
-    if (array[mid]===obj) return mid;
+    mid = (low + high) >> 1;
+    if (array[mid] === obj) return mid;
     array[mid] < obj ? low = mid + 1 : high = mid;
   }
   if (near) return low;
-  else if (array[low]===obj) return low;else return -1;
+  else if (array[low] === obj) return low;else return -1;
 };
 var indexOfSorted_str = function (array, obj, near) { 
   var low = 0,
@@ -281,10 +281,13 @@ var createLocalEngine=function(kdb,opts,cb,context) {
 		method.hotfix_segoffset_before20150710(engine);
 		method.buildSegnameIndex(engine);
 	}
+
+		var t=new Date();
 	var preload=method.getPreloadField(opts.preload);
 	var opts={recursive:true};
 	method.gets.apply(engine,[ preload, opts,function(res){
 		setPreload(res);
+		//console.log("pre load ",new Date()-t)
 		cb.apply(engine.context,[engine]);
 	}]);
 	return engine;
@@ -316,8 +319,14 @@ var getLocalTries=function(kdbfn,cb) {
 }
 
 var openLocalReactNative=function(kdbid,opts,cb,context) {
-
 	if (kdbid.indexOf(".kdb")==-1) kdbid+=".kdb";
+
+	var engine=localPool[kdbid];
+	if (engine) {
+		cb.apply(context||engine.context,[0,engine]);
+		return;
+	}
+
 	new Kdb.open(kdbid,function(err,kdb){
 		if (err) {
 			cb.apply(context,[err]);
@@ -333,6 +342,13 @@ var openLocalReactNative=function(kdbid,opts,cb,context) {
 
 var openLocalKsanagap=function(kdbid,opts,cb,context) {
 	var kdbfn=kdbid;
+
+
+	var engine=localPool[kdbid];
+	if (engine) {
+		cb.apply(context||engine.context,[0,engine]);
+		return;
+	}
 	var tries=getLocalTries(kdbfn);
 
 	for (var i=0;i<tries.length;i++) {
@@ -357,6 +373,13 @@ var openLocalKsanagap=function(kdbid,opts,cb,context) {
 }
 var openLocalNode=function(kdbid,opts,cb,context) {
 	var fs=require('fs');
+
+	var engine=localPool[kdbid];
+	if (engine) {
+		cb.apply(context||engine.context,[0,engine]);
+		return;
+	}
+
 	var tries=getLocalTries(kdbid);
 	for (var i=0;i<tries.length;i++) {
 		if (fs.existsSync(tries[i])) {
@@ -382,7 +405,7 @@ var openLocalFile=function(file,opts,cb,context) {
 
 		var engine=localPool[kdbid];
 		if (engine) {
-			cb(0,engine);
+			cb.apply(context||engine.context,[0,engine]);
 			return;
 		}
 
@@ -441,7 +464,7 @@ var open=function(kdbid,opts,cb,context)  {
 		openLocalNode(kdbid,opts,cb,context);
 	} else if (platform=="html5" || platform=="chrome"){
 		openLocalHtml5(kdbid,opts,cb,context);		
-	} else if (platform=="react-native") {
+	} else if (platform.substr(0,12)=="react-native") {
 		openLocalReactNative(kdbid,opts,cb,context);	
 	} else {
 		openLocalKsanagap(kdbid,opts,cb,context);	
@@ -480,7 +503,7 @@ var API={open:open,setPath:setPath, close:closeLocal, enumKdb:enumKdb, bsearch:b
 kdbs:kdbs,listkdb:listkdb};
 
 var platform=require("./platform").getPlatform();
-if (platform=="node-webkit" || platform=="node" || platform=="react-native") {
+if (platform=="node-webkit" || platform=="node" || platform.substr(0,12)=="react-native") {
 	enumKdb();
 } else if (typeof io!=="undefined") {
 	API.rpc=require("./rpc_kde"); //for browser only
@@ -625,6 +648,20 @@ var listkdb_html5=function(cb,context) {
 			cb.call(this,kdbs);
 	},context||this);		
 }
+var listkdb_rn_ios=function(cb,context) {
+	cb(0,[]);
+}
+var listkdb_rn_android=function(cb,context) {
+	/*
+	kfs=require("react-native-android-kdb");	
+	
+	kfs.readDir(".",function(kdbs){
+			cb.call(this,kdbs);
+	},context||this);		
+*/
+	cb(0,[]);
+}
+
 var listkdb_rpc=function() {
 	var fs=require("fs");
 	var path=require("path");
@@ -705,6 +742,10 @@ var listkdb=function(cb,context) {
 		listkdb_node(cb,context);
 	} else if (platform=="chrome") {
 		listkdb_html5(cb,context);
+	} else if (platform=="react-native-android"){
+		listkdb_rn_android(cb,context);
+	} else if (platform=="react-native-ios"){
+		listkdb_rn_ios(cb,context);
 	} else {
 		listkdb_ksanagap(cb,context);
 	}
@@ -838,17 +879,6 @@ var fileSegToAbsSeg=function(file,seg) {
 //	segid-=range.start;
 //    return {file:fileid,seg:segid};
 //}
-var indexOfSorted_str = function (array, obj, near) { 
-  var low = 0,
-  high = array.length;
-  while (low < high) {
-    var mid = (low + high) >> 1;
-    if (array[mid]==obj) return mid;
-    (array[mid].localeCompare(obj)<0) ? low = mid + 1 : high = mid;
-  }
-  if (near) return low;
-  else if (array[low]==obj) return low;else return -1;
-};
 var searchSeg=function(segname,near) {
 	var i=bsearch(this.get("segnames"),segname,near);
 	if (i>-1) {
@@ -1065,13 +1095,13 @@ var prevSeg=function(segid) {
 
 var txt2absseg=function(txtid) {
 	var absseg=this.txtid[txtid];
-	if (!absseg) return null;
+	if (isNaN(absseg)) return null;
 	if (typeof absseg[0]==="number") absseg=absseg[0];
 	return absseg;
 }
 var txtid2fileSeg=function(txtid) {
 	var absseg=txt2absseg.call(this,txtid);
-	if (!absseg) return;
+	if (isNaN(absseg)) return;
 	return absSegToFileSeg.call(this,absseg);
 }
 
@@ -1083,19 +1113,19 @@ var vpos2txtid=function(vpos){
 
 var nextTxtid=function(txtid) {
 	var absseg=txt2absseg.call(this,txtid);
-	if (!absseg) return;
+	if (isNaN(absseg)) return;
 	var segnames=this.get("segnames");
 	return segnames[absseg+1];
 }
 var prevTxtid=function(txtid) {
 	var absseg=txt2absseg.call(this,txtid);
-	if (!absseg) return;
+	if (isNaN(absseg)) return;
 	var segnames=this.get("segnames");
 	return segnames[absseg-1];
 }
 var txtid2vpos=function(txtid) {
 	var absseg=txt2absseg.call(this,txtid);
-	if (!absseg) return;
+	if (isNaN(absseg)) return;
 	var segoffsets=this.get("segoffsets");
 	return segoffsets[absseg];
 
@@ -1160,8 +1190,18 @@ module.exports={setup:setup,getPreloadField:getPreloadField,gets:gets
 var getPlatform=function() {
 	if (typeof ksanagap=="undefined") {
 		try {
-			require("react-native");
-			platform="react-native";
+			var react_native=require("react-native");
+			try {
+				var OS=react_native.Platform.OS;
+				if (OS==='android') {
+					require("react-native-android-kdb");
+					platform="react-native-android";					
+				} else {
+					platform="react-native-ios";	
+				}
+			} catch (e) {
+				platform='chrome';
+			}
 		} catch (e) {
 			if (typeof process=="undefined") {
 				platform="chrome";
@@ -1175,7 +1215,7 @@ var getPlatform=function() {
 	return platform;
 }
 module.exports={getPlatform:getPlatform};
-},{"react-native":undefined}],9:[function(require,module,exports){
+},{"react-native":undefined,"react-native-android-kdb":undefined}],9:[function(require,module,exports){
 /*
 	this is for browser, a simple wrapper for socket.io rpc
 	
@@ -1305,7 +1345,11 @@ var open=function(fn_url,cb) {
 		return;
 	}
 
-	if (!API.initialized) {init(1024*1024,function(){
+	if (!API.initialized) {init(1024*1024,function(bytes,fs){
+		if (!fs) {
+			cb(null);//cannot open , htmlfs is not available
+			return;
+		}
 		_open.apply(this,[fn_url,cb]);
 	},this)} else _open.apply(this,[fn_url,cb]);
 }
@@ -1343,6 +1387,10 @@ var initfs=function(grantedBytes,cb,context) {
 	}, errorHandler);
 }
 var init=function(quota,cb,context) {
+	if (!navigator.webkitPersistentStorage) {
+		cb.apply(context,[0,null]);
+		return;
+	}
 	navigator.webkitPersistentStorage.requestQuota(quota, 
 			function(grantedBytes) {
 				initfs(grantedBytes,cb,context);
@@ -2796,42 +2844,7 @@ var boolSearch=function(opts) {
 	return this;
 }
 module.exports={search:boolSearch}
-},{"./plist":21}],18:[function(require,module,exports){
-var indexOfSorted = function (array, obj, near) { 
-  var low = 0,
-  high = array.length;
-  while (low < high) {
-    var mid = (low + high) >> 1;
-    if (array[mid]==obj) return mid;
-    array[mid] < obj ? low = mid + 1 : high = mid;
-  }
-  if (near) return low;
-  else if (array[low]==obj) return low;else return -1;
-};
-var indexOfSorted_str = function (array, obj, near) { 
-  var low = 0,
-  high = array.length;
-  while (low < high) {
-    var mid = (low + high) >> 1;
-    if (array[mid]==obj) return mid;
-    (array[mid].localeCompare(obj)<0) ? low = mid + 1 : high = mid;
-  }
-  if (near) return low;
-  else if (array[low]==obj) return low;else return -1;
-};
-
-
-var bsearch=function(array,value,near) {
-	var func=indexOfSorted;
-	if (typeof array[0]=="string") func=indexOfSorted_str;
-	return func(array,value,near);
-}
-var bsearchNear=function(array,value) {
-	return bsearch(array,value,true);
-}
-
-module.exports=bsearch;
-},{}],19:[function(require,module,exports){
+},{"./plist":20}],18:[function(require,module,exports){
 var plist=require("./plist");
 var fetchtext=require("./fetchtext");
 var getPhraseWidths=function (Q,phraseid,vposs) {
@@ -3299,7 +3312,7 @@ module.exports={resultlist:resultlist,
 	highlightFile:highlightFile,
 	highlightRange:highlightRange,
 };
-},{"./fetchtext":20,"./plist":21}],20:[function(require,module,exports){
+},{"./fetchtext":19,"./plist":20}],19:[function(require,module,exports){
 var indexOfSorted=require("./plist").indexOfSorted;
 
 var getSeg=function(engine,fileid,segid,opts,cb,context) {
@@ -3422,7 +3435,7 @@ var getFile=function(engine,fileid,cb) {
 }
 
 module.exports=	{file:getFile,seg:getSeg,segSync:getSegSync,range:getRange,page:getPage,pageRange:getPageRange};
-},{"./plist":21}],21:[function(require,module,exports){
+},{"./plist":20}],20:[function(require,module,exports){
 
 var unpack = function (ar) { // unpack variable length integer list
   var r = [],
@@ -3506,7 +3519,7 @@ var groupbyposting=function(arr,gposting) { //relative vpos
 }
 var groupbyposting2=function(arr,gposting) { //absolute vpos
   if (!arr || !arr.length) return [];
-  if (!gposting.length) return [arr.length];
+  if (!gposting || !gposting.length) return [arr.length];
   var out=[];
   for (var i=0;i<=gposting.length;i++) out[i]=[];
   
@@ -3522,7 +3535,7 @@ var groupbyposting2=function(arr,gposting) { //absolute vpos
     p++;
   }
   //remaining
-  while(i<arr.length) out[out.length-1].push(arr[i++]-gposting[gposting.length-1]);
+  while(i<arr.length) out[out.length-1].push(arr[i++]);
   return out;
 }
 var groupbyblock2 = function(ar, ntoken,slotshift,opts) {
@@ -3848,7 +3861,7 @@ plist.groupbyposting2=groupbyposting2;
 plist.groupsum=groupsum;
 plist.combine=combine;
 module.exports=plist;
-},{}],22:[function(require,module,exports){
+},{}],21:[function(require,module,exports){
 /*
 var dosearch2=function(engine,opts,cb,context) {
 	opts
@@ -3918,6 +3931,9 @@ var expandTerm=function(engine,regex) {
 var isWildcard=function(raw) {
 	return !!raw.match(/[\*\?]/);
 }
+var hasWildcard=function(raw) {
+	return ~raw.indexOf("?") || ~raw.indexOf("*");
+}
 
 var isOrTerm=function(term) {
 	term=term.trim();
@@ -3981,7 +3997,7 @@ var parseNumber=function(raw) {
 	}
 }
 var parseWildcard=function(raw) {
-	var n=parseNumber(raw) || 1;
+	var n=parseNumber(raw.substr(1)) || 1;
 	var qcount=raw.split('?').length-1;
 	var scount=raw.split('*').length-1;
 	var type='';
@@ -4156,11 +4172,21 @@ var fastPhrase=function(engine,phrase,cb) {
 	});
 }
 var slowPhrase=function(engine,terms,phrase) {
-	var j=0,tokens=engine.analyzer.tokenize(phrase).tokens;
+	var parts=[],lastidx=0;
+	phrase.replace(/[ ་]?([\?\*]\d?)[ ་]?/g,function(m,m1,idx){
+		s=phrase.substring(lastidx,idx);
+		parts.push(s);
+		parts.push(m1);
+		lastidx=idx+m.length;
+	});
+
+	parts.push(phrase.substring(lastidx));
+	
+	var j=0;//,tokens=engine.analyzer.tokenize(phrase).tokens;
 	var phrase_term=newPhrase();
 	var termid=0;
-	while (j<tokens.length) {
-		var raw=tokens[j], termlength=1;
+	while (j<parts.length) {
+		var raw=parts[j], termlength=1;
 		if (isWildcard(raw)) {
 			if (phrase_term.termid.length==0)  { //skip leading wild card
 				j++
@@ -4171,7 +4197,7 @@ var slowPhrase=function(engine,terms,phrase) {
 			phrase_term.termid.push(termid);
 			phrase_term.termlength.push(termlength);
 		} else if (isOrTerm(raw)){
-			var term=orTerms.apply(this,[tokens,j]);
+			var term=orTerms.apply(this,[parts,j]);
 			if (term) {
 				terms.push(term);
 				termid=terms.length-1;
@@ -4181,15 +4207,8 @@ var slowPhrase=function(engine,terms,phrase) {
 			phrase_term.termid.push(termid);
 			phrase_term.termlength.push(termlength);
 		} else {
-			var phrase="";
-			while (j<tokens.length) {
-				if (!(isWildcard(tokens[j]) || isOrTerm(tokens[j]))) {
-					phrase+=tokens[j];
-					j++;
-				} else break;
-			}
 
-			var splitted=splitPhrase(engine,phrase);
+			var splitted=splitPhrase(engine,parts[j]);
 			for (var i=0;i<splitted.tokens.length;i++) {
 				var term=parseTerm(engine,splitted.tokens[i]);
 				if (!term) continue;
@@ -4255,8 +4274,7 @@ var newQuery =function(engine,query,opts,cb) {
 				}
 			}
 
-			if (isSimplePhrase(phrases[pc]) && engine.mergePostings ) {
-				
+			if (isSimplePhrase(phrases[pc]) && engine.mergePostings && !hasWildcard(phrases[pc]) ) {
 				fastPhrase(engine,phrases[pc],function(res){
 					taskqueue.shift()(res);
 				});
@@ -4424,17 +4442,17 @@ var main=function(engine,q,opts,cb){
 					phrase_intersect(engine,Q);
 				}
 				var fileoffsets=Q.engine.get("fileoffsets");
-				//console.log("search opts "+JSON.stringify(opts));
-
-				if (!Q.byFile && Q.rawresult && Q.rawresult.length && !opts.nogroup) {
-					Q.byFile=plist.groupbyposting2(Q.rawresult, fileoffsets);
-					Q.byFile.shift();Q.byFile.pop();
-					Q.byFolder=groupByFolder(engine,Q.byFile);
-
-					countFolderFile(Q);
-				}
-
+				//console.log("search opts "+JSON.stringify(opts));	
+				
 				if (opts.range) {
+					if (!Q.byFile && Q.rawresult && Q.rawresult.length) {
+						//console.log("grouping",Q.rawresult.length,fileoffsets.length)
+						Q.byFile=plist.groupbyposting2(Q.rawresult, fileoffsets);
+						Q.byFile.shift();Q.byFile.pop();
+						Q.byFolder=groupByFolder(engine,Q.byFile);
+						countFolderFile(Q);
+					}
+
 					engine.searchtime=new Date()-starttime;
 					excerpt.resultlist(engine,Q,opts,function(data) { 
 						//console.log("excerpt ok");
@@ -4457,63 +4475,90 @@ var main=function(engine,q,opts,cb){
 }
 
 main.splitPhrase=splitPhrase; //just for debug
+main.slowPhrase=slowPhrase;
 module.exports=main;
-},{"./boolsearch":17,"./excerpt":19,"./plist":21}],23:[function(require,module,exports){
+},{"./boolsearch":17,"./excerpt":18,"./plist":20}],22:[function(require,module,exports){
+"use strict";
 var rangeOfTreeNode=function(toc,n) {
   //setting the ending vpos of a treenode
   //this value is fixed when hits is changed, but not saved in kdb
-  if (typeof toc[n].end!=="undefined") return;
+  if (toc[n].end!==undefined) {
+    return;
+  }
 
   if (n+1>=toc.length) {
     return;
   }
-  var depth=toc[n].d , nextdepth=toc[n+1].d;
-  if (n==toc.length-1 || n==0) {
+  var depth=toc[n].d , nextdepth=toc[n+1].d ,next;
+  if (n===toc.length-1 || n===0) {
       toc[n].end=Math.pow(2, 48);
       return;
-  } else  if (nextdepth>depth){
+  } 
+
+  if (nextdepth>depth){
     if (toc[n].n) {
-    	if (toc[toc[n].n]) toc[n].end=toc[toc[n].n].vpos;
-    	else toc[n].end= Number.MAX_VALUE;  
+    	if (toc[toc[n].n]) {
+        toc[n].end=toc[toc[n].n].vpos;
+      } else {
+        toc[n].end= Number.MAX_VALUE;  
+      }
     } else { //last sibling
-      var next=n+1;
-      while (next<toc.length && toc[next].d>depth) next++;
-      if (next==toc.length) toc[n].end=Math.pow(2,48);
-      else toc[n].end=toc[next].voff;
+      next=n+1;
+      while (next<toc.length && toc[next].d>depth) {
+        next+=1;
+      }
+      if (next===toc.length) {
+        toc[n].end=Math.pow(2,48);
+      } else {
+        toc[n].end=toc[next].voff;
+      }
     }
   } else { //same level or end of sibling
     toc[n].end=toc[n+1].vpos;
   }
-}
-var calculateHit=function(toc,hits,n) {
+};
 
-  var start=toc[n].vpos;
-  var end=toc[n].end;
-  if (n==0) {
+var calculateHit=function(toc,hits,n) {
+  var i, start=toc[n].vpos, end=toc[n].end,hitcount=0,firstvpos=toc[n].vpos;
+  if (n===0) {
     return hits.length;
-  } else {
-    var hit=0;
-    for (var i=0;i<hits.length;i++) {
-      if (hits[i]>=start && hits[i]<end) hit++;
-    }
-    return hit;
   }
-}
+  for (i=0;i<hits.length;i+=1) {
+    if (hits[i]>=start && hits[i]<end) {
+      if (hitcount===0){
+        firstvpos=hits[i];
+      }
+      hitcount+=1;
+    }
+  }
+  return {hitcount:hitcount,firstvpos:firstvpos};
+};
 
 var treenodehits=function(toc,hits,n) {
-  if (!hits || !hits.length) return 0;
+  if (!hits || !hits.length) {
+    return 0;
+  }
 
-  if (toc.length<2) return 0 ;
+  if (toc.length<2) {
+    return 0 ;
+  }
 
   //need to clear toc[n].hit when hits is changed.
   //see index.js clearHits()
-   if (!toc[n]) return 0;
-  if (typeof toc[n].hit!=="undefined") return toc[n].hit;
+   if (!toc[n]) {
+    return 0;
+  }
+
+  if (toc[n].hit!==undefined) {
+    return toc[n].hit;
+  }
 
   rangeOfTreeNode(toc,n);
-
-  return toc[n].hit=calculateHit(toc,hits,n);
-}
+  var res=calculateHit(toc,hits,n);
+  toc[n].hit=res.hitcount;
+  toc[n].firstvpos=res.firstvpos;
+  return res.hitcount;
+};
 
 module.exports=treenodehits;
 },{}],"ksana-analyzer":[function(require,module,exports){
@@ -4567,7 +4612,6 @@ module.exports={
 
 //  need a KDE instance to be functional
 
-var bsearch=require("./bsearch");
 var dosearch=require("./search");
 
 var prepareEngineForSearch=function(engine,cb){
@@ -4692,15 +4736,12 @@ var api={
 	,highlightRange:_highlightRange
 	,searchInTag:_searchInTag
 	,excerpt:require("./excerpt")	
+	,open:openEngine
+	,_search:dosearch
 }
 module.exports=api;
-},{"./bsearch":18,"./excerpt":19,"./fetchtext":20,"./search":22,"ksana-analyzer":"ksana-analyzer","ksana-database":"ksana-database"}],"ksana-simple-api":[function(require,module,exports){
-/*
-	TODO : fetch tags
-	render tags
-
-*/
-
+},{"./excerpt":18,"./fetchtext":19,"./search":21,"ksana-analyzer":"ksana-analyzer","ksana-database":"ksana-database"}],"ksana-simple-api":[function(require,module,exports){
+"use strict";
 var kse=require("ksana-search");
 var plist=require("ksana-search/plist");
 var kde=require("ksana-database");
@@ -4709,81 +4750,109 @@ var treenodehits=require("./treenodehits");
 //make sure db is opened
 var nextUti=function(opts,cb){
 	kde.open(opts.db,function(err,db){
-		if (err) cb(err);
-		else cb(0,db.nextTxtid(opts.uti));
-	});		
-}
+		if (err) {
+			cb(err);
+		} else {
+			cb(0,db.nextTxtid(opts.uti));
+		}
+	});
+};
 //make sure db is opened
 var prevUti=function(opts,cb){
 	kde.open(opts.db,function(err,db){
-		if (err) cb(err);
-		else cb(0,db.prevTxtid(opts.uti));
-	});		
-}
-
-var __iterate=function(db,funcname,opts,cb,context){
-	var out=[];
-	var next=opts.uti;
-	var count=opts.count||10;
-	var func=db[funcname];
-	for (var i=0;i<count;i++) {
-		next=func.call(db,next);
-		if (!next) break;
-
-		if (funcname==="nextTxtid") {
-			out.push(next);
+		if (err) {
+			cb(err);
 		} else {
-			out.unshift(next);
+			cb(0,db.prevTxtid(opts.uti));
+		}
+	});
+};
+
+
+var clearHits=function(toc){
+	var i;
+	for (i=0;i<toc.length;i+=1) {
+		//remove the field, make sure treenodehits will calculate new value.
+		if (toc[i].hit!==undefined) {
+			delete toc[i].hit;
 		}
 	}
-	opts.uti=out;
-	fetch(opts,cb,context);
-}
-var _iterate=function(funcname,opts,cb,context) {
-	if (!opts.q) {
-		kde.open(opts.db,function(err,db){
-			if (!err) __iterate(db,funcname,opts,cb,context);
-			else console.error(err);
-		});
-		return;
-	}
-	kse.search(opts.db,opts.q,function(err,res){
-		if (!err) __iterate(res.engine,funcname,opts,cb,context);
-		else console.error(err);
-	});
-}
+};
 
-var next=function(opts,cb,context) {
-	_iterate("nextTxtid",opts,cb,context);
-}
-var prev=function(opts,cb,context) {
-	_iterate("prevTxtid",opts,cb,context);
-}
-
-var _clearHits=function(toc){
-	for (var i=0;i<toc.length;i++) {
-		//remove the field, make sure treenodehits will calculate new value.
-		if (typeof toc[i].hit!=="undefined") delete toc[i].hit;
+var bsearchVposInToc = function (toc, obj, near) { 
+  var mid,low = 0,
+  high = toc.length;
+  while (low < high) {
+    mid = (low + high) >> 1;
+    if (toc[mid].vpos===obj) {
+    	return mid-1;
+    }
+    if (toc[mid].vpos < obj) {
+    	low = mid + 1;
+    } else {
+    	high = mid;
+    } 
+  }
+  if (near) {
+  	return low-1;
+  } 
+  if (toc[low].vpos===obj) {
+  	return low;
+  }
+  return -1;
+};
+var enumAncestors=function(toc,n) {
+	var parents=[0], cur=toc[n],depth=0, now=0,next;
+	while ( toc[now+1]&&toc[now+1].vpos<= cur.vpos ) {
+		now+=1;
+		next=toc[now].n;
+		//jump to sibling which has closest vpos
+		while ((next && toc[next].vpos<=cur.vpos) || (toc[now+1] && toc[now+1].d===toc[now].d)) {
+			if (next) {
+				now=next;
+				next=toc[now].n;				
+			} else {
+				next=now+1; //next row is sibling
+			}
+		}
+		if (toc[now].d>depth && toc[now].d<cur.d) {
+			parents.push(now);
+			depth=toc[now].d;
+		} else {
+			break;
+		}
 	}
-}
+	return parents;
+};
 
 var breadcrumb=function(db,opts,toc,tocname){
-	var vpos=opts.vpos;
-	if (opts.uti && typeof vpos==="undefined") {
+	var nodeseq,breadcrumb,out,p,vpos=opts.vpos;
+	if (opts.uti && opts.vpos===undefined) {
 			vpos=db.txtid2vpos(opts.uti);
 	}
+	p=bsearchVposInToc(toc,vpos,true);
+	if (p===-1) {
+		out={nodeseq:[0],breadcrumb:[toc[0]]};
+	}  else {
+		nodeseq=enumAncestors(toc,p);
+		nodeseq.push(p);
+		breadcrumb=nodeseq.map(function(n){return toc[n];});
+		out={ nodeseq: nodeseq, breadcrumb:breadcrumb};
+	}
+	if (tocname) {
+		out.name=tocname;
+		out.tocname=tocname; //legacy code
+		out.toc=toc;
+	}
 
-	var p=bsearchVposInToc(toc,vpos,true);
-	var nodeseq=enumAncestors(toc,p);
-	nodeseq.push(p);
-	var breadcrumb=nodeseq.map(function(n){return toc[n]});
-	return { name:tocname,tocname:tocname,nodeseq: nodeseq, breadcrumb:breadcrumb, toc:toc};
-}
+	return out;
+};
 var toc=function(opts,cb,context) {
-	var that=this;
-	
 	if (!opts.q) {
 		kde.open(opts.db,function(err,db){
+			if (err) {
+				cb(err);
+			}
 			var tocname=opts.name||opts.tocname||db.get("meta").toc;
 			db.getTOC({tocname:tocname},function(toc){
 				if (opts.vpos||opts.uti) {
@@ -4792,131 +4861,210 @@ var toc=function(opts,cb,context) {
 					cb(0,{name:tocname,toc:toc,tocname:tocname});	
 				}
 			});
-		});
+		},context);
 		return;
 	}
 
-	kse.search(opts.db,opts.q,{},function(err,res){
-		if (!res) throw "cannot open database "+opts.db;
-		var tocname=opts.name||opts.tocname||res.engine.get("meta").toc;
-		var db=res.engine;
+	kse.search(opts.db,opts.q,opts,function(err,res){
+		if (err || !res) {
+			throw "cannot open database "+opts.db;
+		}
+		var tocname=opts.name||opts.tocname||res.engine.get("meta").toc,db=res.engine;
 		res.engine.getTOC({tocname:tocname},function(toc){
-			_clearHits(toc);
+			clearHits(toc);
 			if (opts.vpos||opts.uti) {
 					var out=breadcrumb(db,opts,toc,tocname);
-					console.log(out.nodeseq)
 					out.nodeseq.map(function(seq){
 						//console.log(seq)
 						treenodehits(toc,res.rawresult,seq);
-					})
+					});
 					cb(0,out);
 			} else {
 				cb(0,{name:tocname,toc:toc,hits:res.rawresult,tocname:tocname});	
 			}
 		});
 	});
-}
+};
+
+var getFieldByVpos=function(db,field,vpos) {
+	//make sure field already in cache
+	var i,fieldvpos=db.get(["fields",field+"_vpos"]),
+	fieldvalue=db.get(["fields",field]);
+	if (!fieldvpos || !fieldvalue) {
+		return null;
+	}
+
+	i=bsearch(fieldvpos,vpos,true);
+	if (i>-1) {
+		return fieldvalue[i-1];
+	}
+};
 
 var txtids2key=function(txtids) {
-	if (typeof txtids!="object") {
+	if (typeof txtids!=="object") {
 		txtids=[txtids];
 	}
-	var out=[];
-	for (var i=0;i<txtids.length;i++) {
-		var fseg=this.txtid2fileSeg(txtids[i]);
-		if (!fseg) out.push(["filecontents",0,0]);
-		else out.push(["filecontents",fseg.file,fseg.seg]);
+	var i,fseg,out=[];
+	for (i=0;i<txtids.length;i+=1) {
+		fseg=this.txtid2fileSeg(txtids[i]);
+		if (!fseg) {
+			out.push(["filecontents",0,0]);
+		} else {
+			out.push(["filecontents",fseg.file,fseg.seg]);
+		}
 	}
 	return out;
-}
+};
 
-var hits2markup=function( Q,file,seg, text){
-	var seg1=this.fileSegToAbsSeg(file,seg);
-	var vpos=this.absSegToVpos(seg1);
-	var vpos2=this.absSegToVpos(seg1+1);
-	var hits=kse.excerpt.realHitInRange(Q,vpos,vpos2,text);
-	return hits;
-}
 
-var fetch_res=function(engine,Q,opts,cb){
-	var uti=opts.uti;
-		if (!uti) {
-			uti=[];
-			var vpos=opts.vpos;
-			if (typeof vpos!="object") vpos=[vpos];
-			for (var i=0;i<vpos.length;i++) {
-				var u=engine.vpos2txtid(vpos[i]);
-				uti.push(u);
-			}
+var fetch_res=function(db,Q,opts,cb){
+	var i,u,keys,vpos,uti=opts.uti;
+	if (!uti) {
+		uti=[];
+		vpos=opts.vpos;
+		if (typeof vpos!=="object") {
+			vpos=[vpos];
 		}
-		if (typeof uti!=="object") uti=[uti];
-
-		var keys=txtids2key.call(engine,uti);
-		if (!keys || !keys.length || typeof keys[0][1]=="undefined") {
-			cb("uti not found: "+uti+" in "+opts.db);
-			return;
+		for (i=0;i<vpos.length;i+=1) {
+			u=db.vpos2txtid(vpos[i]);
+			uti.push(u);
 		}
+	}
+	if (typeof uti!=="object") {
+		uti=[uti];
+	} 
 
-		engine.get(keys,function(data){
-			var out=[];
-			for (var i=0;i<keys.length;i++) {
-				var hits=null;
-				if (Q) hits=hits2markup.call(engine,Q,keys[i][1],keys[i][2],data[i]);
-				var vpos=engine.txtid2vpos(uti[i]);
-				out.push({uti:uti[i],text:data[i],hits:hits,vpos:vpos});
+	keys=txtids2key.call(db,uti);
+	if (!keys || !keys.length || keys[0][1]===undefined) {
+		cb("uti not found: "+uti+" in "+opts.db);
+		return;
+	}
+
+	db.get(keys,function(data){
+		var fields,item,out=[],j,k,hits=null,seg1,vp,vp_end;
+		for (j=0;j<keys.length;j+=1) {
+			hits=null;
+			seg1=db.fileSegToAbsSeg(keys[j][1],keys[j][2]);
+			vp=db.absSegToVpos(seg1);
+			vp_end=db.absSegToVpos(seg1+1);
+			if (Q) {
+				hits=kse.excerpt.realHitInRange(Q,vp,vp_end,data[j]);
 			}
+
+			item={uti:uti[j],text:data[j],hits:hits,vpos:vp,vpos_end:vp_end};
+			if (opts.fields) {
+				fields=opts.fields;
+				if (typeof fields==="string") {
+					fields=[fields];
+				}
+				item.values=[];
+				for (k=0;k<fields.length;k+=1) {
+					item.values.push(getFieldByVpos(db,fields[k],vpos));
+				}
+			}
+			out.push(item);
+		}
+		if (opts.breadcrumb!==undefined) {
+			db.getTOC({tocname:opts.breadcrumb||db.get("meta").toc},function(toc){
+				var oo;
+				for (i=0;i<out.length;i+=1) {
+					oo=breadcrumb(db,{uti:out[i].uti},toc);
+					out[i].breadcrumb=oo.breadcrumb;
+					out[i].nodeseq=oo.nodeseq;
+				}
+				cb(0,out);
+			});
+		} else {
 			cb(0,out);
-		});
-}
-var fetch=function(opts,cb,context) {
-	var that=this;
+		}
+		
+	});
+};
+var fetchfields=function(opts,db,cb1){
+	var i,fields=opts.fields,fieldskey=[];
+	if (typeof opts.fields==="string") {
+		fields=[opts.fields];
+	}
+
+
+	for (i=0;i<fields.length;i+=1) {
+		fieldskey.push(["fields",fields[i]]);
+		fieldskey.push(["fields",fields[i]+"_vpos"]);
+	}
+	//console.log("fetching",fieldskey)
+	db.get(fieldskey,cb1);
+};
+
+var fetch=function(opts,cb) {
 	if (!opts.uti && !opts.vpos) {
 		cb("missing uti or vpos");
 		return;
 	}
+
 	if (!opts.q) {
 			kde.open(opts.db,function(err,db){
 				if (err) {
-					cb(err)
+					cb(err);
 				} else {
-					fetch_res(db,null,opts,cb);
+					if (opts.fields) {
+						fetchfields(opts,db,function(){
+							fetch_res(db,null,opts,cb);		
+						});
+					} else {
+						fetch_res(db,null,opts,cb);	
+					}
 				}
 			});
 	} else {
-		kse.search(opts.db,opts.q,{},function(err,res){
+		kse.search(opts.db,opts.q,opts,function(err,res){
 			if (err) {
 				cb(err);
 			} else {
-				fetch_res(res.engine,res,opts,cb)
+					if (opts.fields) {
+						fetchfields(opts,res.engine,function(){
+							fetch_res(res.engine,res,opts,cb);
+						});
+					} else {
+						fetch_res(res.engine,res,opts,cb);
+					}
 			}
 		});		
 	}
-}
+};
 
 var excerpt2defaultoutput=function(excerpt) {
-	var out=[];
-	for (var i=0;i<excerpt.length;i++) {
-		var ex=excerpt[i];
-		var vpos=this.fileSegToVpos(ex.file,ex.seg);
-		var txtid=this.vpos2txtid(vpos);
+	var out=[],i,ex,vpos,txtid;
+	for (i=0;i<excerpt.length;i+=1) {
+		ex=excerpt[i];
+		vpos=this.fileSegToVpos(ex.file,ex.seg);
+		txtid=this.vpos2txtid(vpos);
 		out.push({uti:txtid,text:ex.text,hits:ex.realHits,vpos:vpos});
 	}
 	return out;
-}
+};
 //use startfrom to specifiy starting posting
-var excerpt=function(opts,cb,context) {
-	var that=this;
-	var from=opts.from;
+var excerpt=function(opts,cb) {
+	var i,range={},newopts={};
 	if (!opts.q) {
 		cb("missing q");
 		return;
 	}
 
-	var range={};
-	if (opts.from) range.from=opts.from;
-	if (opts.count) range.maxseg=opts.count;
+	if (opts.from) {
+		range.from=opts.from;
+	}
+	if (opts.count) {
+		range.maxseg=opts.count;
+	}
+	for (i in opts) {
+		if (opts.hasOwnProperty(i)){
+			newopts[i]=opts[i];	
+		}
+	}
+	newopts.nohighlight=true;
+	newopts.range=range;
 
-	kse.search(opts.db,opts.q,{nohighlight:true,range:range},
+	kse.search(opts.db,opts.q,newopts,
 		function(err,res){
 		if (err) {
 			cb(err);
@@ -4925,70 +5073,78 @@ var excerpt=function(opts,cb,context) {
 			cb(0,excerpt2defaultoutput.call(res.engine,res.excerpt));
 		}
 	});	
-}
+};
 
 var beginWith=function(s,txtids) {
-	var out=[];
-	for (var i=1;i<s.length;i++) {
+	var out=[],i,tofind,idx;
+	for (i=1;i<s.length;i+=1) {
 		tofind=s.substr(0,i);
-		var idx=bsearch(txtids,tofind);
-		if (idx>-1) out.push(txtids[idx]);
+		idx=bsearch(txtids,tofind);
+		if (idx>-1) {
+			out.push(txtids[idx]);
+		}
 	}
 	return out;
-}
+};
+
 var scan=function(opts,cb,context) {
-	kse.search(opts.db,opts.q,{},function(err,res){
+	kse.search(opts.db,opts.q,opts,function(err,res){
 		if (err) {
 			cb(err);
 			return;
 		}
-		var db=res.engine;
-		var out=[];
-		var segnames=db.get("segnames");
-		for (var i=0;i<opts.sentence.length;i++) {
-			var q=opts.sentence.substr(i);
+		var q,db=res.engine,out=[],i,segnames=db.get("segnames");
+		for (i=0;i<opts.sentence.length;i+=1) {
+			q=opts.sentence.substr(i);
 			out=out.concat(beginWith(q,segnames));
 		}
 		cb(0,out);
-	});
-}
+	},context);
+};
 
 var filterField=function(items,regex,filterfunc) {
-	if (!regex) return [];
-	var reg=new RegExp(regex);
-	var out=[];
+	if (!regex) {
+		return [];
+	}
+	var i, item,reg=new RegExp(regex), out=[];
 	filterfunc=filterfunc|| reg.test.bind(reg);
-	for (var i=0;i<items.length;i++) {
-		var item=items[i];
+	for (i=0;i<items.length;i+=1) {
+		item=items[i];
 		if (filterfunc(item,regex)) {
 			out.push({text:item,idx:i});
 		}
 	}
 	return out;
-}
+};
 
-var groupByField=function(db,searchres,field,regex,filterfunc,cb) {
+var groupByField=function(db,rawresult,field,regex,filterfunc,postfunc,cb) {
 	db.get(["fields",field],function(fields){
-		var rawresult=searchres.rawresult;
+		if (!fields) {
+			cb("field "+field+" not found");
+			return;
+		}
 		db.get([["fields",field+"_vpos"],["fields",field+"_depth"]],function(res){
-			var items=[], fieldsvpos=res[0],fieldsdepth=res[1];
+			var fieldhit,reg,i,item,matches,items=[], fieldsvpos=res[0],fieldsdepth=res[1],
+			prevdepth=65535,inrange=false, fieldhits;
 			if (!rawresult||!rawresult.length) {
-				var matches=filterField(fields,regex,filterfunc);
-				for (var i=0;i<matches.length;i++) {
-					var item=matches[i];
+				matches=filterField(fields,regex,filterfunc);
+
+				for (i=0;i<matches.length;i+=1) {
+					item=matches[i];
 					items.push({text:item.text, uti: db.vpos2txtid(fieldsvpos[item.idx]), vpos:fieldsvpos[item.idx]});
 				}
 				cb(0,items);
 			} else {
-				var fieldhits= plist.groupbyposting2(rawresult, fieldsvpos);
+				fieldhits = plist.groupbyposting2(rawresult, fieldsvpos);
+
+				reg =new RegExp(regex);
+
 				fieldhits.shift();
-		    var out=[];
-		    var reg=new RegExp(regex);
+
 		    filterfunc=filterfunc|| reg.test.bind(reg);
-		    var prevdepth=65535,inrange=false;
-		    for (var i=0;i<fieldhits.length;i++) {
-		      var fieldhit=fieldhits[i];
-		      var item=fields[i];
+		    for (i=0;i<fieldhits.length;i+=1) {
+		      fieldhit=fieldhits[i];
+		      item=fields[i];
 
 		      //all depth less than prevdepth will considered in range.
 		      if (filterfunc(item,regex)) {
@@ -4997,67 +5153,93 @@ var groupByField=function(db,searchres,field,regex,filterfunc,cb) {
 		      		prevdepth=fieldsdepth[i];
 		      	}
 		      } else if (inrange) {
-		      	if (fieldsdepth[i]==prevdepth) {//turn off inrange
+		      	if (fieldsdepth[i]===prevdepth) {//turn off inrange
 		      		inrange=false;
 		      		prevdepth=65535;
 		      	}
 		      }
 
-		      if (!fieldhit || !fieldhit.length) continue;
-		      if (inrange) {
-		      	items.push({text: item, vpos: fieldhit[0], uti:db.vpos2txtid(fieldhit[0]) , hits:fieldhit});
+		      if (inrange && fieldhits && fieldhit.length) {
+		      	item={text: item, vpos: fieldhit[0], uti:db.vpos2txtid(fieldhit[0]) , hits:fieldhit};
+		      	if (postfunc) {
+		      		postfunc(item);
+		      	}
+		      	items.push(item);
 		      }
 		    }		
 				cb(0,items);
-			};
+			}
 		});
 	});
-}
+};
 
-var groupByTxtid=function(db,searchresult,regex,filterfunc,cb) {
-	var rawresult=searchresult.rawresult;
+var groupByTxtid=function(db,rawresult,regex,filterfunc,cb) {
+	var i,matches,seghits,items=[],out=[],item,vpos,seghit,reg,
+	  segnames=db.get("segnames"),segoffsets=db.get("segoffsets");
+
 	if (!rawresult||!rawresult.length) {
 		//no q , filter all field
-		if (searchresult.query) {
-			cb(0,[]);
-		} else {
-			var values=db.get("segnames");
-			var segoffsets=db.get("segoffsets");
-			var matches=filterField(values,regex,filterfunc);
+		matches=filterField(segnames,regex,filterfunc);
 
-			items=matches.map(function(item){
-				return {text:item.text, uti:item.text, vpos:segoffsets[item.idx]};
-			})
-			cb(0,items);
-		}
+		items=matches.map(function(item){
+			return {text:item.text, uti:item.text, vpos:segoffsets[item.idx]};
+		});
+		cb(0,items);
+
 	} else {
-		var segoffsets=db.get("segoffsets");
-    var seghits= plist.groupbyposting2(rawresult, segoffsets); 
-    var txtid=db.get("segnames");
-    var out=[];
-    var reg=new RegExp(regex);
-		 filterfunc=filterfunc|| reg.test.bind(reg);
-    for (var i=0;i<seghits.length;i++) {
-      var seghit=seghits[i];
-      if (!seghit || !seghit.length) continue;
-      var item=txtid[i-1];
-      var vpos=segoffsets[i-1];
-		  if (filterfunc(item,regex)) {
-		  	out.push({text:item,uti:item,hits:seghit,vpos:vpos});
+    seghits= plist.groupbyposting2(rawresult, segoffsets);
+    reg=new RegExp(regex);
+
+		filterfunc=filterfunc|| reg.test.bind(reg);
+    for (i=0;i<seghits.length;i+=1) {
+      seghit=seghits[i];
+      if (seghit &&seghit.length) {
+	      item=segnames[i-1];
+	      vpos=segoffsets[i-1];
+			  if (filterfunc(item,regex)) {
+			  	out.push({text:item,uti:item,hits:seghit,vpos:vpos});
+	      }      	
       }
     }
     cb(0,out);
 	}
-}
+};
 
-var _group=function(db,opts,res,cb){
-		filterfunc=opts.filterfunc||null;
-		if (opts.field) {
-			groupByField(db,res,opts.field,opts.regex,filterfunc,cb);
-		} else {
-			groupByTxtid(db,res,opts.regex,filterfunc,cb);
+
+var trimResult=function(rawresult,rs) {
+	//assume ranges not overlap, todo :combine continuous range
+	var start,end,s,e,r,i,res=[],
+	  ranges=JSON.parse(JSON.stringify(rs));
+	ranges.sort(function(a,b){return a[0]-b[0];});
+	for (i=0;i<ranges.length;i+=1) {
+		start=ranges[i][0];
+		end=ranges[i][1];
+		s=bsearch(rawresult,start,true);
+		e=bsearch(rawresult,end,true);
+		r=rawresult.slice(s,e);
+		res=res.concat(r);
+	}
+	return res;
+};
+var groupInner=function(db,opts,res,cb){
+	var filterfunc=opts.filterfunc||null,
+	  rawresult=res.rawresult;
+	if (opts.field) {
+		if (opts.ranges) {
+			rawresult=trimResult(rawresult,opts.ranges);
 		}
-}
+		groupByField(db,rawresult,opts.field,opts.regex,filterfunc,null,cb);
+	} else {
+		if ((!res.rawresult || !res.rawresult.length)&& res.query) {
+			cb(0,[]);//no search result
+		} else {
+			if (opts.ranges) {
+				rawresult=trimResult(rawresult,opts.ranges);
+			}
+			groupByTxtid(db,rawresult,opts.regex,filterfunc,cb);
+		}
+	}
+};
 var filter=function(opts,cb) {
 	if (!opts.q){
 		if (!opts.regex) {
@@ -5065,177 +5247,262 @@ var filter=function(opts,cb) {
 			return;
 		}
 		kde.open(opts.db,function(err,db){
-			_group(db,opts,{rawresult:null},cb);
-		})
+			if (err) {
+				cb(err);
+				return;
+			}
+			groupInner(db,opts,{rawresult:null},cb);
+		});
 	} else {
-		kse.search(opts.db,opts.q,{},function(err,res){
-			_group(res.engine,opts,res,cb);
+		kse.search(opts.db,opts.q,opts,function(err,res){
+			if (err) {
+				cb(err);
+				return;
+			}
+			groupInner(res.engine,opts,res,cb);
 		});
 	}
-}
+};
 var listkdb=kde.listkdb;
 
+var task=function(dbname,searchable,taskqueue,tofind){
+		taskqueue.push(function(err,data){
+			if (!err && !(typeof data==='object' && data.empty)) {
+				searchable.map(function(db){
+					if (db.shortname===data.dbname) {
+						db.hits=data.rawresult.length;
+					}
+				});
+			}
+			kse.search(dbname,tofind,taskqueue.shift(0,data));
+		});
+};
 
 var fillHits=function(searchable,tofind,cb) {
-	var taskqueue=[],out=[];
-	for (var i=0;i<searchable.length;i++) {
-		(function(dbname){
-			taskqueue.push(function(err,data){
-				if (typeof data=='object' && data.__empty) {
-					//not pushing the first call
-				} else {
-					searchable.map(function(db){
-						if (db.shortname===data.dbname) {
-							db.hits=data.rawresult.length;
-						}
-					})
-				}
-				kse.search(dbname,tofind,taskqueue.shift(0,data));
-			});;
-		})(searchable[i].fullname)
-	};
+	var i,taskqueue=[];
+	for (i=0;i<searchable.length;i+=1) {
+		task(searchable[i].fullname,searchable,taskqueue,tofind);
+	}
 
-	taskqueue.push(function(err,data){
-
+	taskqueue.push(function(){
 		searchable.sort(function(a,b){
 			return b.hits-a.hits;
 		});
-
-		cb(searchable);
+		cb(searchable);			
 	});
-	taskqueue.shift()(0,{__empty:true});
-}
+	taskqueue.shift()(0,{empty:true});
+};
+
 var tryOpen=function(kdbid,cb){
-	if ((window.location.protocol==="file:" && typeof process==="undefined") 
-	|| typeof io==="undefined" ) {
-		cb("local file mode");
+	var nw=window.process!==undefined && window.process.__node_webkit;
+	var protocol=window.location.protocol;
+	var socketio= window.io!==undefined;
+
+	if ( (protocol==="http:" || protocol==="https:") && !socketio) {
+		cb("http+local file mode");
 		return;
 	}
+
+	if (protocol==="file:" && !nw) {
+		cb("local file mode");
+	}
+
 	kde.open(kdbid,function(err){
 		cb(err);
 	});
-}
+};
 var renderHits=function(text,hits,func){
-  var ex=0,out=[];
+  var i, ex=0,out=[],now;
   hits=hits||[];
-  for (var i=0;i<hits.length;i++) {
-    var now=hits[i][0];
+  for (i=0;i<hits.length;i+=1) {
+    now=hits[i][0];
     if (now>ex) {
       out.push(func({key:i},text.substring(ex,now)));
     }
     out.push(func({key:"h"+i, className:"hl"+hits[i][2]},text.substr(now,hits[i][1])));
-    ex=now+=hits[i][1];
+    ex = now+hits[i][1];
   }
   out.push(func({key:i+1},text.substr(ex)));
   return out;
-}  
+};
 
 var get=function(dbname,key,cb) { //low level get
-	var db=kde.open(dbname,function(err,db){
+	kde.open(dbname,function(err,db){
 		if (err) {
 			cb(err);
 		} else {
 			db.get(key,cb);
 		}
 	});
-}
-var vpos2txtid=function(dbname,vpos,cb){
-	var db=kde.open(dbname,function(err,db){
-		if (err) cb(err);
-		else cb(0,db.vpos2txtid(vpos));
-	});
-}
-var txtid2vpos=function(dbname,txtid,cb){
-	var db=kde.open(dbname,function(err,db){
-		if (err) cb(err);
-		else cb(0,db.txtid2vpos(txtid));
-	});
-}
-
-var bsearchVposInToc = function (toc, obj, near) { 
-  var low = 0,
-  high = toc.length;
-  while (low < high) {
-    var mid = (low + high) >> 1;
-    if (toc[mid].vpos==obj) return mid-1;
-    toc[mid].vpos < obj ? low = mid + 1 : high = mid;
-  }
-  if (near) return low-1;
-  else if (toc[low].vpos==obj) return low;else return -1;
 };
-//from ksana2015-stackto
-var enumAncestors=function(toc,cur) {
-    if (!toc || !toc.length) return;
-    if (cur==0) return [];
-    var n=cur-1;
-    var depth=toc[cur].d - 1;
-    var parents=[];
-    while (n>=0 && depth>0) {
-      if (toc[n].d==depth) {
-        parents.unshift(n);
-        depth--;
-      }
-      n--;
-    }
-    parents.unshift(0); //first ancestor is root node
-    return parents;
-}
-/*
-var breadcrumb=function(opts,cb,context) {
+
+var vpos2uti=function(opts,cb){
 	kde.open(opts.db,function(err,db){
-
-		var vpos=opts.vpos;
-		if (opts.uti && typeof vpos==="undefined") {
-			vpos=db.txtid2vpos(opts.uti);
+		if (err) {
+			cb(err);
+		} else {
+			cb(0,db.vpos2txtid(opts.vpos));
 		}
+	});
+};
 
-		if (!vpos) {
-			cb("must have uti or vpos");
+var uti2vpos=function(opts,cb){
+	kde.open(opts.db,function(err,db){
+		if (err) {
+			cb(err);
+		} else {
+			cb(0,db.txtid2vpos(opts.uti));
+		}
+	});
+};
+
+
+
+var sibling=function(opts,cb) {
+	var uti=opts.uti,keys,segs,idx;
+
+	kde.open(opts.db,function(err,db){
+		if (err) {
+			cb(err);
 			return;
 		}
-
-		var tocname=opts.name||opts.tocname||db.get("meta").toc;
-		db.getTOC({tocname:tocname},function(toc){
-			var p=bsearchVposInToc(toc,vpos,true);
-			var nodes=enumAncestors(toc,p);
-			nodes.push(p);
-			var breadcrumb=nodes.map(function(n){return toc[n]});
-			cb(0,{ nodes: nodes, breadcrumb:breadcrumb, toc:toc});
-		});
-	});
-}
-*/
-var sibling=function(opts,cb,context) {
-	var uti=opts.uti;
-
-	kde.open(opts.db,function(err,db){
-		if (typeof opts.vpos !=="undefined" && typeof opts.uti==="undefined") {
+		if ( opts.vpos !==undefined && opts.uti===undefined) {
 			uti=db.vpos2txtid(opts.vpos);
 		}
 
-		var keys=txtids2key.call(db,uti);
+		keys=txtids2key.call(db,uti);
 		
 		if (!keys) {
 			cb("invalid uti: "+uti);
 			return;
 		}
-		var segs=db.getFileSegNames(keys[0][1]);
+		segs=db.getFileSegNames(keys[0][1]);
 		if (!segs) {
 			cb("invalid file id: "+keys[0][1]);
 			return;			
 		}
-		var idx=segs.indexOf(uti);
+		idx=segs.indexOf(uti);
 		cb(0,{sibling:segs,idx:idx});
-	})
+	});
+};
 
-}
+var findField=function(array,item) {
+	var i;
+	for(i=0;i<array.length;i+=1){
+		if (array[i]===item) {
+			return i;
+		}
+	}
+	return -1;
+};
+
+var getFieldRange=function(opts,cb){
+	var i,v,p,start,end,vsize,fieldcaption,fieldvpos,out,error=null,values=opts.values;
+	if (!opts.field) {
+		error="missing field";
+	}
+	if (!opts.values) {
+		error="missing value";
+	}
+	if (!opts.db) {
+		error="missing db";
+	}
+
+	if (typeof opts.values==="string"){
+		values=[opts.values];
+	}
+	if (error) {
+		cb(error);
+		return;
+	}
+	get(opts.db,[["meta","vsize"],["fields",opts.field],["fields",opts.field+"_vpos"]],function(data){
+		if (!data) {
+			cb("error loading field "+opts.field);
+			return;
+		}
+		vsize=data[0];
+		fieldcaption=data[1];
+		fieldvpos=data[2];
+		out=[];
+		for (i=0;i<values.length;i+=1) {
+			v=values[i];
+			p=findField(fieldcaption,v);
+			start=vsize;
+			end=vsize;
+			if (p>-1) {
+				start=fieldvpos[p];
+			}
+			if (p<fieldvpos.length-1) {
+				end=fieldvpos[p+1];
+			}
+			out.push([start,end]);
+		}
+		cb(0,out);
+	});
+};
+
+var iterateInner=function(db,funcname,opts,cb,context){
+	var out=[], next=opts.uti,  count=opts.count||10,  func=db[funcname], i;
+
+	for (i=0;i<count;i+=1) {
+		next=func.call(db,next);
+		if (!next) {
+			break;
+		}
+
+		if (funcname==="nextTxtid") {
+			out.push(next);
+		} else {
+			out.unshift(next);
+		}
+	}
+
+	opts.uti=out;
+	fetch(opts,cb,context);
+};
+
+var iterate=function(funcname,opts,cb,context) {
+	if (!opts.q) {
+		kde.open(opts.db,function(err,db){
+			if (!err) {
+				iterateInner(db,funcname,opts,cb,context);
+			}
+			else {
+				cb(err);
+			}
+		},context);
+		return;
+	}
+	kse.search(opts.db,opts.q,opts,function(err,res){
+		if (!err) {
+			iterateInner(res.engine,funcname,opts,cb,context);
+		} else {
+			cb(err);
+		}
+	},context);
+};
+
+var search=function(opts,cb,context){
+	kse.search(opts.db,opts.q,opts,function(err,res){
+		cb(err,res);
+	},context);
+};
+
+var next=function(opts,cb,context) {
+	iterate("nextTxtid",opts,cb,context);
+};
+
+var prev=function(opts,cb,context) {
+	iterate("prevTxtid",opts,cb,context);
+};
+
 var API={
 	next:next,
 	prev:prev,
 	nextUti:nextUti,
 	prevUti:prevUti,
-	vpos2txtid:vpos2txtid,
-	txtid2vpos:txtid2vpos,	
+	vpos2uti:vpos2uti,
+	uti2vpos:uti2vpos,	
 	toc:toc,
 	fetch:fetch,
 	sibling:sibling,
@@ -5247,7 +5514,11 @@ var API={
 	renderHits:renderHits,
 	tryOpen:tryOpen,
 	get:get,
-	treenodehits:treenodehits
-}
+	treenodehits:treenodehits,
+	getFieldRange:getFieldRange,
+	search:search
+
+};
 module.exports=API;
-},{"./treenodehits":23,"ksana-database":"ksana-database","ksana-search":"ksana-search","ksana-search/plist":21}]},{},[]);
+
+},{"./treenodehits":22,"ksana-database":"ksana-database","ksana-search":"ksana-search","ksana-search/plist":20}]},{},[]);
