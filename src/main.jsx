@@ -98,8 +98,9 @@ var maincomponent = React.createClass({
           onFilter={this.onFilter} />
       </div>
       <div style={styles.rightpanel}>
-      <BreadcrumbTOC toc={this.state.toc} vpos={this.state.vpos} hits={this.state.rawhits} treenodeHits={ksa.treenodehits}
-          onSelect={this.onBreadcrumbSelect} buttonClass="btn btn-link" separator="/"/>
+      <BreadcrumbTOC style={{fontSize:24}} toc={this.state.toc} vpos={this.state.vpos} hits={this.state.rawhits} treenodeHits={ksa.treenodehits}
+          onSelect={this.onBreadcrumbSelect} keyword={this.state.tofind1} 
+          buttonClass="btn btn-link" separator="/"/>
         <SegNav size={11} segs={this.state.segnames} value={this.state.txtid} onGoSegment={this.onGoSegment}/>
         <br/>
         {this.renderText()}

@@ -108,8 +108,9 @@ var maincomponent = React.createClass({displayName: "maincomponent",
           onFilter: this.onFilter})
       ), 
       React.createElement("div", {style: styles.rightpanel}, 
-      React.createElement(BreadcrumbTOC, {toc: this.state.toc, vpos: this.state.vpos, hits: this.state.rawhits, treenodeHits: ksa.treenodehits, 
-          onSelect: this.onBreadcrumbSelect, buttonClass: "btn btn-link", separator: "/"}), 
+      React.createElement(BreadcrumbTOC, {style: {fontSize:24}, toc: this.state.toc, vpos: this.state.vpos, hits: this.state.rawhits, treenodeHits: ksa.treenodehits, 
+          onSelect: this.onBreadcrumbSelect, keyword: this.state.tofind1, 
+          buttonClass: "btn btn-link", separator: "/"}), 
         React.createElement(SegNav, {size: 11, segs: this.state.segnames, value: this.state.txtid, onGoSegment: this.onGoSegment}), 
         React.createElement("br", null), 
         this.renderText()
@@ -123,14 +124,13 @@ var React,Dropdown,View;
 var pc=function(){
 	React=require("react");	
 	Dropdown=require("./dropdown_bs");
-	View="div"; 
+	View="span"; 
 }
 
 try {
 	React=require("react-native");
-	Dropdown=require("./dropdown");
+	Dropdown=require("./dropdown");//dropdown.android.js or dropdown.ios.js
 	View=React.View;
-	console.log(View)
 	if (!View) pc();
 } catch(e) {
 	pc();
@@ -246,7 +246,7 @@ var BreadcrumbTOC=React.createClass({
 		return out;
 	}
 	,render:function(){
-		if (View==="div") {
+		if (View==="span") {
 			return E(View,null,this.renderCrumbs());
 		} else {
 
@@ -256,8 +256,7 @@ var BreadcrumbTOC=React.createClass({
 })
 module.exports=BreadcrumbTOC;
 },{"./dropdown":"C:\\ksana2015\\node_modules\\ksana2015-breadcrumbtoc\\dropdown.js","./dropdown_bs":"C:\\ksana2015\\node_modules\\ksana2015-breadcrumbtoc\\dropdown_bs.js","react":"react","react-native":"react-native"}],"C:\\ksana2015\\node_modules\\ksana2015-breadcrumbtoc\\dropdown.js":[function(require,module,exports){
-
-
+/* empty stub for browserify*/
 },{}],"C:\\ksana2015\\node_modules\\ksana2015-breadcrumbtoc\\dropdown_bs.js":[function(require,module,exports){
 var React=require("react");
 var E=React.createElement;
@@ -312,14 +311,14 @@ var BreadCrumbDropdown=React.createClass({
 	,render:function(){
 		var item=this.props.items[this.props.selected];
 		if (!item)return E("span");
-		var title=item.t;
+		var title=this.renderKeyword(item.t);
 
 		item.hit&&(title=[E("span",{key:1},item.t),E("span",{key:2,className:"hl0 pull-right"},item.hit||"")]);
 		return E("span",{className:"dropdown"},
 				E("button",{key:"drop","data-toggle":"dropdown",className:this.props.buttonClass||"btn btn-default",
-					onClick:this.open}, this.props.items[this.props.selected].t ),
+					onClick:this.open}, this.renderKeyword(this.props.items[this.props.selected].t) ),
 				this.props.separator,
-				E("ul",{className:"dropdown-menu open",id:"for_shutting_warning_up",title:this.renderKeyword(title)},
+				E("ul",{className:"dropdown-menu open",id:"for_shutting_warning_up",title:title},
 			this.props.items.map(this.renderItem)));
 	}
 });
